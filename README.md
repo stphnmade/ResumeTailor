@@ -1,67 +1,131 @@
-# Resume Alignment Engine (RAE)
+# ResumeTailor MVP (Web + API)
 
-CLI MVP for deterministic, ATS-focused resume tailoring from a LaTeX source-of-truth.
+ResumeTailor is a private LaTeX-first resume optimizer.
 
-## What It Does
+- Frontend target: `https://stphnmade.github.io/ResumeTailor/` (GitHub Pages)
+- Backend target: Vercel API routes (`/api/generate-tex`, `/api/compile-pdf`)
+- Primary output: optimized LaTeX (copy + `.tex` download)
+- Secondary output: auto-downloaded compiled PDF
 
-- Input: `resume.tex` + `job_description.txt`
-- Output: `tailored_resume.tex`
-- Preserves LaTeX template/macros/list structure
-- Reorders and trims existing bullets by JD relevance
-- Optional conservative bullet reframing with OpenAI (`--rewrite`)
-- Never requires pasting API keys into prompts or committed config
+## Architecture
 
-## Safety Constraints
+- `src/*`: Vite + React frontend
+- `api/generate-tex.js`: resume optimization API
+- `api/compile-pdf.js`: LaTeX PDF compilation API using `tectonic`
+- `api/_lib/*`: shared backend logic (CORS, parsing, validation, OpenAI)
 
-- No fabrication by default design: only existing bullets are used
-- No new tools/metrics/employers are added
-- Output remains LaTeX source so you keep full compile control
+## Security + Secrets
 
-## Setup
+- `OPENAI_API_KEY` is read from environment only.
+- No API key is exposed to client code.
+- CORS is restricted to GitHub Pages origin in production.
+- Request size limits and compile timeout are enforced.
+- Raw resumes are not logged.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+## Local Development
 
-Create `.env.local` in repo root:
-
-```bash
-OPENAI_API_KEY="your_key_here"
-OPENAI_MODEL="gpt-4.1-mini"
-```
-
-`.env` and `.env.local` are git-ignored.
-
-## Usage
+### 1) Install frontend dependencies
 
 ```bash
-python tailor.py resume.tex job.txt -o tailored_resume.tex
+npm install
 ```
 
-Optional flags:
+### 2) Configure environment
 
-- `--rewrite`: rewrite selected bullets conservatively via OpenAI
-- `--aggression balanced|conservative|aggressive`: controls density and ranking intensity
-- `--max-bullets N`: global cap override for one-page density heuristics
-- `--compile-check`: run `pdflatex` compile validation on the generated output
-- `--report-json report.json`: emit JD/alignment report
+Copy `.env.example` and set values as needed.
 
-Example:
+- For GitHub Pages build usage:
+  - `VITE_API_BASE_URL="https://<your-vercel-project>.vercel.app"`
+- For backend OpenAI usage (Vercel env vars):
+  - `OPENAI_API_KEY`
+  - `OPENAI_MODEL` (optional, default `gpt-4.1-mini`)
+
+### 3) Run frontend
 
 ```bash
-python tailor.py resume.tex job.txt -o tailored_resume.tex --aggression aggressive --rewrite --compile-check --report-json report.json
+npm run dev
 ```
 
-## Notes
+## API Contracts
 
-- If OpenAI key/client is unavailable, JD analysis falls back to local heuristic extraction.
-- OpenAI calls are server/CLI side only.
-- `--compile-check` requires `pdflatex` available in `PATH`.
+### `POST /api/generate-tex`
 
-## Tests
+Request:
 
-```bash
-python -m unittest discover -s tests -v
+```json
+{
+  "resume_tex": "string",
+  "job_description": "string"
+}
 ```
+
+Response:
+
+```json
+{
+  "optimized_tex": "string",
+  "metadata": {
+    "removed_projects": ["string"],
+    "keyword_focus": ["string"],
+    "warning": "string"
+  }
+}
+```
+
+### `POST /api/compile-pdf`
+
+Request:
+
+```json
+{
+  "tex": "string"
+}
+```
+
+Success response:
+
+- `200 OK`
+- `Content-Type: application/pdf`
+- Binary PDF bytes
+
+Error response:
+
+```json
+{
+  "error": "LATEX_COMPILE_FAILED",
+  "log": "string"
+}
+```
+
+## Behavior Summary
+
+- Resume input validation:
+  - requires `\\begin{document}` and `\\end{document}`
+  - max 200 KB
+- Job description validation:
+  - required
+  - max 30,000 chars
+- Preamble before `\\begin{document}` is preserved verbatim.
+- Hallucination guard rejects outputs that introduce new technology terms.
+- One-page heuristics trim low-value content and set a warning if still likely dense.
+- Frontend shows optimized LaTeX immediately and attempts PDF compile/download afterward.
+
+## Deployment
+
+### GitHub Pages (frontend)
+
+- Build with `npm run build`.
+- Publish `dist/` to GitHub Pages for this repository.
+- Vite base path is configured for `/ResumeTailor/`.
+
+### Vercel (backend + optional static)
+
+- Add environment variables in Vercel Project Settings:
+  - `OPENAI_API_KEY`
+  - `OPENAI_MODEL` (optional)
+- Ensure `tectonic` is available in runtime if using PDF compilation route.
+- `vercel.json` sets function timeout to 30 seconds.
+
+## Existing CLI Prototype
+
+The earlier Python CLI prototype remains in this repo (`tailor.py`, `rae/*`) and is independent from the web MVP.
