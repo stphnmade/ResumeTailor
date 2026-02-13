@@ -1,131 +1,63 @@
-# ResumeTailor MVP (Web + API)
+# ResumeTailor Monorepo
 
-ResumeTailor is a private LaTeX-first resume optimizer.
+This repository is split into:
 
-- Frontend target: `https://stphnmade.github.io/ResumeTailor/` (GitHub Pages)
-- Backend target: Vercel API routes (`/api/generate-tex`, `/api/compile-pdf`)
-- Primary output: optimized LaTeX (copy + `.tex` download)
-- Secondary output: auto-downloaded compiled PDF
+- `frontend/` - Vite + React app for GitHub Pages
+- `backend/` - Vercel serverless API (`backend/api/*`)
 
-## Architecture
+## Repository Layout
 
-- `src/*`: Vite + React frontend
-- `api/generate-tex.js`: resume optimization API
-- `api/compile-pdf.js`: LaTeX PDF compilation API using `tectonic`
-- `api/_lib/*`: shared backend logic (CORS, parsing, validation, OpenAI)
+- `frontend/index.html`
+- `frontend/src/*`
+- `frontend/vite.config.js` (`base: '/ResumeTailor/'` for GitHub Pages)
+- `backend/api/health.ts`
+- `backend/api/generate-tex.js`
+- `backend/api/compile-pdf.js`
+- `backend/vercel.json`
+- `.github/workflows/deploy-pages.yml`
 
-## Security + Secrets
+## Secrets Policy
 
-- `OPENAI_API_KEY` is read from environment only.
-- No API key is exposed to client code.
-- CORS is restricted to GitHub Pages origin in production.
-- Request size limits and compile timeout are enforced.
-- Raw resumes are not logged.
+- Never commit secrets.
+- Only commit `.env.example`.
+- `OPENAI_API_KEY` is backend-only and must be set in Vercel Environment Variables.
+- Do not put `OPENAI_API_KEY` in frontend code or frontend env vars.
 
-## Local Development
+## Frontend Deployment (GitHub Pages)
 
-### 1) Install frontend dependencies
+A GitHub Actions workflow is included at `.github/workflows/deploy-pages.yml`.
 
-```bash
-npm install
-```
+It:
 
-### 2) Configure environment
+1. Installs `frontend/` dependencies
+2. Builds `frontend/dist`
+3. Deploys `frontend/dist` to GitHub Pages
 
-Copy `.env.example` and set values as needed.
+Set repository variable `VITE_API_BASE_URL` to your deployed Vercel backend origin (for example `https://your-backend.vercel.app`).
 
-- For GitHub Pages build usage:
-  - `VITE_API_BASE_URL="https://<your-vercel-project>.vercel.app"`
-- For backend OpenAI usage (Vercel env vars):
-  - `OPENAI_API_KEY`
-  - `OPENAI_MODEL` (optional, default `gpt-4.1-mini`)
+After deployment, frontend URL should be:
 
-### 3) Run frontend
+- `https://stphnmade.github.io/ResumeTailor/`
 
-```bash
-npm run dev
-```
+## Backend Deployment (Vercel)
 
-## API Contracts
+1. In Vercel, import this GitHub repository.
+2. Set **Root Directory** to `backend`.
+3. Deploy.
+4. In Vercel Project Settings -> Environment Variables, set:
+   - `OPENAI_API_KEY`
+   - `OPENAI_MODEL` (optional, e.g. `gpt-4.1-mini`)
 
-### `POST /api/generate-tex`
+`backend/vercel.json` configures serverless function runtime settings.
 
-Request:
+## Verification Checklist
 
-```json
-{
-  "resume_tex": "string",
-  "job_description": "string"
-}
-```
-
-Response:
-
-```json
-{
-  "optimized_tex": "string",
-  "metadata": {
-    "removed_projects": ["string"],
-    "keyword_focus": ["string"],
-    "warning": "string"
-  }
-}
-```
-
-### `POST /api/compile-pdf`
-
-Request:
-
-```json
-{
-  "tex": "string"
-}
-```
-
-Success response:
-
-- `200 OK`
-- `Content-Type: application/pdf`
-- Binary PDF bytes
-
-Error response:
-
-```json
-{
-  "error": "LATEX_COMPILE_FAILED",
-  "log": "string"
-}
-```
-
-## Behavior Summary
-
-- Resume input validation:
-  - requires `\\begin{document}` and `\\end{document}`
-  - max 200 KB
-- Job description validation:
-  - required
-  - max 30,000 chars
-- Preamble before `\\begin{document}` is preserved verbatim.
-- Hallucination guard rejects outputs that introduce new technology terms.
-- One-page heuristics trim low-value content and set a warning if still likely dense.
-- Frontend shows optimized LaTeX immediately and attempts PDF compile/download afterward.
-
-## Deployment
-
-### GitHub Pages (frontend)
-
-- Build with `npm run build`.
-- Publish `dist/` to GitHub Pages for this repository.
-- Vite base path is configured for `/ResumeTailor/`.
-
-### Vercel (backend + optional static)
-
-- Add environment variables in Vercel Project Settings:
-  - `OPENAI_API_KEY`
-  - `OPENAI_MODEL` (optional)
-- Ensure `tectonic` is available in runtime if using PDF compilation route.
-- `vercel.json` sets function timeout to 30 seconds.
-
-## Existing CLI Prototype
-
-The earlier Python CLI prototype remains in this repo (`tailor.py`, `rae/*`) and is independent from the web MVP.
+1. Backend health endpoint:
+   - `GET https://<your-backend>.vercel.app/api/health`
+   - Expected JSON: `{ "ok": true }`
+2. Frontend page loads at:
+   - `https://stphnmade.github.io/ResumeTailor/`
+3. Frontend can call backend:
+   - Trigger Generate flow and confirm API requests target `VITE_API_BASE_URL`
+4. Confirm no secret leakage:
+   - Search frontend for `OPENAI_API_KEY` (should be none)
