@@ -40,7 +40,7 @@ def load_runtime_env(repo_root: Path) -> None:
 
 
 def get_openai_api_key() -> str | None:
-    return os.getenv("OPENAI_KEY")
+    return os.getenv("OPENAI_API_KEY")
 
 
 def get_openai_model() -> str:

@@ -5,6 +5,46 @@ import path from "node:path";
 
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
 
+type ModelPayload = {
+  optimizedTex: string;
+  keywordFocus: string[];
+  removedProjects: string[];
+  includedProjects: string[];
+};
+
+type ValidationResult = {
+  ok: boolean;
+  failures: string[];
+  projectCount: number;
+  bulletCount: number;
+  keywordCoverage: string[];
+  keywordTargets: string[];
+  requiredCoverage: number;
+};
+
+type SupportKeyword = {
+  term: string;
+  patterns: string[];
+};
+
+const SUPPORT_KEYWORDS: SupportKeyword[] = [
+  { term: "technical support", patterns: ["technical support", "first-level support", "first level support", "l1 support", "helpdesk"] },
+  { term: "troubleshooting", patterns: ["troubleshooting", "diagnosis", "debugging", "triage"] },
+  { term: "incident management", patterns: ["incident", "incident management", "incident response"] },
+  { term: "escalation", patterns: ["escalate", "escalation", "l2", "l3"] },
+  { term: "standard operating procedures", patterns: ["sop", "standard operating procedure", "runbook"] },
+  { term: "documentation", patterns: ["document", "documentation", "knowledge base"] },
+  { term: "ticketing systems", patterns: ["ticket", "ticketing", "servicenow", "jira", "tdx"] },
+  { term: "customer service", patterns: ["customer", "client", "service", "satisfaction"] },
+  { term: "communication", patterns: ["communication", "stakeholder", "phone", "email", "chat"] },
+  { term: "collaboration", patterns: ["collaboration", "team", "cross-functional", "cross functional"] },
+  { term: "windows", patterns: ["windows"] },
+  { term: "linux", patterns: ["linux"] },
+  { term: "networking", patterns: ["network", "tcp/ip", "tcp", "dns"] },
+  { term: "monitoring", patterns: ["monitor", "monitoring", "uptime", "performance"] },
+  { term: "ownership", patterns: ["ownership", "urgency", "accountability"] },
+];
+
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -130,6 +170,108 @@ function extractJson(text: string): any {
   }
 }
 
+function normalizeText(input: string): string {
+  return (input || "")
+    .toLowerCase()
+    .replace(/\\_/g, " ")
+    .replace(/\\textbf\{|\\textit\{|\\emph\{|\\href\{|\\small\{|\\scshape|\\Huge|\\vspace\{[^}]*\}/g, " ")
+    .replace(/\\[a-zA-Z]+\*?(\[[^\]]*\])?(\{[^}]*\})?/g, " ")
+    .replace(/[^a-z0-9+/.\-\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesAnyPattern(haystack: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => haystack.includes(pattern.toLowerCase()));
+}
+
+function deriveSupportKeywordsFromJD(jobDescription: string): string[] {
+  const jd = normalizeText(jobDescription);
+  const matched: string[] = [];
+
+  for (const keyword of SUPPORT_KEYWORDS) {
+    if (includesAnyPattern(jd, keyword.patterns)) {
+      matched.push(keyword.term);
+    }
+  }
+
+  if (matched.length < 8) {
+    for (const keyword of SUPPORT_KEYWORDS) {
+      if (!matched.includes(keyword.term)) {
+        matched.push(keyword.term);
+      }
+      if (matched.length >= 8) {
+        break;
+      }
+    }
+  }
+
+  return matched.slice(0, 12);
+}
+
+function countMatches(text: string, regex: RegExp): number {
+  return (text.match(regex) || []).length;
+}
+
+function computeKeywordCoverage(optimizedTex: string, targets: string[]): string[] {
+  const tex = normalizeText(optimizedTex);
+  const covered: string[] = [];
+
+  for (const term of targets) {
+    const keyword = SUPPORT_KEYWORDS.find((item) => item.term === term);
+    if (!keyword) continue;
+    if (includesAnyPattern(tex, keyword.patterns)) {
+      covered.push(term);
+    }
+  }
+
+  return covered;
+}
+
+function validateOptimization(optimizedTex: string, keywordTargets: string[]): ValidationResult {
+  const projectCount = countMatches(optimizedTex, /\\resumeProjectHeading\s*\{/g);
+  const bulletCount = countMatches(optimizedTex, /\\resumeItem\s*\{/g);
+  const keywordCoverage = computeKeywordCoverage(optimizedTex, keywordTargets);
+  const requiredCoverage = Math.min(8, keywordTargets.length);
+
+  const failures: string[] = [];
+  if (projectCount < 2 || projectCount > 3) {
+    failures.push(`PROJECT_COUNT_OUT_OF_RANGE:${projectCount}`);
+  }
+  if (bulletCount < 11) {
+    failures.push(`BULLET_COUNT_TOO_LOW:${bulletCount}`);
+  }
+  if (keywordCoverage.length < requiredCoverage) {
+    failures.push(`KEYWORD_COVERAGE_TOO_LOW:${keywordCoverage.length}/${requiredCoverage}`);
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    projectCount,
+    bulletCount,
+    keywordCoverage,
+    keywordTargets,
+    requiredCoverage,
+  };
+}
+
+function buildCorrectionMessage(validation: ValidationResult): string {
+  const missing = validation.keywordTargets.filter((item) => !validation.keywordCoverage.includes(item));
+
+  return [
+    "Regenerate once to satisfy deterministic constraints.",
+    "Do not fabricate any content.",
+    "Keep LaTeX valid and one-page dense.",
+    `Current failures: ${validation.failures.join(", ")}`,
+    "Required corrections:",
+    "- include exactly 2-3 projects with strongest JD alignment",
+    "- ensure total bullet count is at least 11",
+    `- ensure keyword coverage reaches at least ${validation.requiredCoverage}`,
+    `- add truthful language covering missing terms where evidence exists: ${missing.join(", ") || "none"}`,
+  ].join("\n");
+}
+
 function summarizeError(err: any) {
   const cause =
     typeof err?.cause === "string"
@@ -149,6 +291,56 @@ function summarizeError(err: any) {
     type: err?.type ? String(err.type) : undefined,
     cause: cause ? cause.slice(0, 240) : undefined,
   };
+}
+
+function parseModelPayload(parsed: any): ModelPayload {
+  const optimizedTex = String(parsed?.optimized_tex || "").trim();
+  const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
+    ? parsed.metadata.keyword_focus.map((x: any) => String(x))
+    : [];
+  const removedProjects = Array.isArray(parsed?.metadata?.removed_projects)
+    ? parsed.metadata.removed_projects.map((x: any) => String(x))
+    : [];
+  const includedProjects = Array.isArray(parsed?.metadata?.included_projects)
+    ? parsed.metadata.included_projects.map((x: any) => String(x))
+    : [];
+
+  return {
+    optimizedTex,
+    keywordFocus,
+    removedProjects,
+    includedProjects,
+  };
+}
+
+async function runOptimizationPass(
+  client: OpenAI,
+  model: string,
+  systemPrompt: string,
+  baseUserPrompt: string,
+  correctionMessage?: string
+): Promise<ModelPayload> {
+  const effectiveUserPrompt = correctionMessage
+    ? `${baseUserPrompt}\n\n[REGENERATION_CORRECTION]\n${correctionMessage}`
+    : baseUserPrompt;
+
+  const response = await client.responses.create({
+    model,
+    temperature: 0.2,
+    input: [
+      {
+        role: "system",
+        content: [{ type: "input_text", text: systemPrompt }],
+      },
+      {
+        role: "user",
+        content: [{ type: "input_text", text: effectiveUserPrompt }],
+      },
+    ],
+  });
+
+  const parsed = extractJson(response.output_text || "");
+  return parseModelPayload(parsed);
 }
 
 export default async function handler(
@@ -172,25 +364,32 @@ export default async function handler(
       return res.status(400).json({ error: "Missing input" });
     }
 
+    const sourceResumeTex = String(resume_tex);
+    const sourceJobDescription = String(job_description);
+    const supportKeywordTargets = deriveSupportKeywordsFromJD(sourceJobDescription);
+
     const { systemPrompt, userPrompt, values } = await loadPromptAndRules();
     const renderedUserPrompt = renderTemplate(userPrompt, {
       ...values,
-      RESUME_TEX: String(resume_tex),
-      JOB_DESCRIPTION: String(job_description),
+      RESUME_TEX: sourceResumeTex,
+      JOB_DESCRIPTION: sourceJobDescription,
     });
 
-    const keySource = process.env.OPENAI_KEY
-      ? "OPENAI_KEY"
-      : process.env.OPENAI_API_KEY
-        ? "OPENAI_API_KEY"
-        : "none";
-    const apiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY;
+    const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
+    const apiKey = process.env.OPENAI_API_KEY;
+    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+
     if (!apiKey) {
       return res.status(200).json({
-        optimized_tex: String(resume_tex),
+        optimized_tex: sourceResumeTex,
         metadata: {
           keyword_focus: [],
+          keyword_coverage: [],
+          support_keywords_target: supportKeywordTargets,
+          coverage_required: Math.min(8, supportKeywordTargets.length),
+          coverage_total: 0,
           removed_projects: [],
+          included_projects: [],
           optimizer: "fallback",
           model: "none",
           warning: "OPENAI_UNAVAILABLE_FALLBACK",
@@ -200,31 +399,24 @@ export default async function handler(
     }
 
     const client = new OpenAI({ apiKey });
-    let response;
+
+    let firstPass: ModelPayload;
     try {
-      response = await client.responses.create({
-        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-        temperature: 0.2,
-        input: [
-          {
-            role: "system",
-            content: [{ type: "input_text", text: systemPrompt }],
-          },
-          {
-            role: "user",
-            content: [{ type: "input_text", text: renderedUserPrompt }],
-          },
-        ],
-      });
+      firstPass = await runOptimizationPass(client, model, systemPrompt, renderedUserPrompt);
     } catch (openaiErr: any) {
       const details = summarizeError(openaiErr);
       return res.status(200).json({
-        optimized_tex: String(resume_tex),
+        optimized_tex: sourceResumeTex,
         metadata: {
           keyword_focus: [],
+          keyword_coverage: [],
+          support_keywords_target: supportKeywordTargets,
+          coverage_required: Math.min(8, supportKeywordTargets.length),
+          coverage_total: 0,
           removed_projects: [],
+          included_projects: [],
           optimizer: "fallback",
-          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+          model,
           warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
           key_source: keySource,
           openai_error: details,
@@ -232,53 +424,79 @@ export default async function handler(
       });
     }
 
-    try {
-      const parsed = extractJson(response.output_text || "");
-      const optimizedTex = String(parsed?.optimized_tex || "").trim();
-      const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
-        ? parsed.metadata.keyword_focus.map((x: any) => String(x))
-        : [];
-      const removedProjects = Array.isArray(parsed?.metadata?.removed_projects)
-        ? parsed.metadata.removed_projects.map((x: any) => String(x))
-        : [];
-
-      if (!optimizedTex) {
-        return res.status(200).json({
-          optimized_tex: String(resume_tex),
-          metadata: {
-            keyword_focus: [],
-            removed_projects: [],
-            optimizer: "fallback",
-            model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-            warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
-            key_source: keySource,
-          },
-        });
-      }
-
+    if (!firstPass.optimizedTex) {
       return res.status(200).json({
-        optimized_tex: optimizedTex,
-        metadata: {
-          keyword_focus: keywordFocus,
-          removed_projects: removedProjects,
-          optimizer: "openai",
-          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-          key_source: keySource,
-        },
-      });
-    } catch (parseErr: any) {
-      return res.status(200).json({
-        optimized_tex: String(resume_tex),
+        optimized_tex: sourceResumeTex,
         metadata: {
           keyword_focus: [],
+          keyword_coverage: [],
+          support_keywords_target: supportKeywordTargets,
+          coverage_required: Math.min(8, supportKeywordTargets.length),
+          coverage_total: 0,
           removed_projects: [],
+          included_projects: [],
           optimizer: "fallback",
-          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-          warning: `OPENAI_INVALID_OUTPUT_FALLBACK: ${String(parseErr?.message || "unknown")}`,
+          model,
+          warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
           key_source: keySource,
         },
       });
     }
+
+    let finalOutput = firstPass;
+    let validation = validateOptimization(firstPass.optimizedTex, supportKeywordTargets);
+    let regenerationAttempted = false;
+    let regenerationFailedMessage = "";
+
+    if (!validation.ok) {
+      regenerationAttempted = true;
+      const correctionMessage = buildCorrectionMessage(validation);
+      try {
+        const secondPass = await runOptimizationPass(
+          client,
+          model,
+          systemPrompt,
+          renderedUserPrompt,
+          correctionMessage
+        );
+        if (secondPass.optimizedTex) {
+          finalOutput = secondPass;
+          validation = validateOptimization(secondPass.optimizedTex, supportKeywordTargets);
+        }
+      } catch (retryErr: any) {
+        const retryDetails = summarizeError(retryErr);
+        regenerationFailedMessage = `${retryDetails.name}: ${retryDetails.message}`;
+      }
+    }
+
+    const warnings: string[] = [];
+    if (!validation.ok) {
+      warnings.push(`POST_VALIDATION_FAILED_AFTER_RETRY:${validation.failures.join(",")}`);
+    }
+    if (regenerationAttempted && regenerationFailedMessage) {
+      warnings.push(`REGENERATION_REQUEST_FAILED:${regenerationFailedMessage}`);
+    }
+
+    return res.status(200).json({
+      optimized_tex: finalOutput.optimizedTex,
+      metadata: {
+        keyword_focus: finalOutput.keywordFocus,
+        keyword_coverage: validation.keywordCoverage,
+        support_keywords_target: supportKeywordTargets,
+        coverage_required: validation.requiredCoverage,
+        coverage_total: validation.keywordCoverage.length,
+        removed_projects: finalOutput.removedProjects,
+        included_projects: finalOutput.includedProjects,
+        project_count: validation.projectCount,
+        bullet_count: validation.bulletCount,
+        regeneration_attempted: regenerationAttempted,
+        validator_failures: validation.failures,
+        optimizer: "openai",
+        model,
+        warning: warnings.length ? warnings.join(" | ") : undefined,
+        key_source: keySource,
+      },
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

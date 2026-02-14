@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { compilePdf, generateTex } from './api';
+import { useEffect, useMemo, useState } from 'react';
+import { BACKEND_URL, compilePdf, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
@@ -11,9 +11,75 @@ function canonicalResumeUrl() {
   return `${normalizedBase}${CANONICAL_RESUME_PATH}`;
 }
 
-function makeFilename(prefix, ext) {
-  const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  return `${prefix}_${ts}.${ext}`;
+function sanitizeToken(value, maxLen = 40) {
+  return String(value || '')
+    .replace(/\\[a-zA-Z]+/g, ' ')
+    .replace(/[{}]/g, ' ')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, maxLen);
+}
+
+function extractCandidateNameFromTex(tex) {
+  const headerMatch = tex.match(/\{\\Huge\s+\\scshape\s+([^}]*)\}/);
+  if (headerMatch?.[1]) {
+    const cleaned = headerMatch[1].replace(/\\[a-zA-Z]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleaned) return cleaned;
+  }
+
+  const commentName = tex.match(/^%\s*([A-Za-z][A-Za-z .'-]{2,})$/m);
+  if (commentName?.[1]) {
+    return commentName[1].trim();
+  }
+
+  return 'candidate';
+}
+
+function extractRoleCompanyFromJD(jd) {
+  const lines = String(jd || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let role = '';
+  const descriptionIndex = lines.findIndex((line) => /^description$/i.test(line));
+  if (descriptionIndex !== -1 && lines[descriptionIndex + 1]) {
+    role = lines[descriptionIndex + 1];
+  }
+
+  if (!role) {
+    role =
+      lines.find(
+        (line) =>
+          !/location|workplace|about the role|responsibilities|required skills|qualifications/i.test(line)
+      ) || '';
+  }
+
+  let company = '';
+  const seekingMatch = jd.match(/([A-Z][A-Za-z0-9&.,\- ]{1,60})\s+is\s+seeking/i);
+  if (seekingMatch?.[1]) {
+    company = seekingMatch[1].trim();
+  }
+
+  if (!company) {
+    const atMatch = jd.match(/\bat\s+([A-Z][A-Za-z0-9&.,\- ]{1,60})/i);
+    if (atMatch?.[1]) {
+      company = atMatch[1].trim();
+    }
+  }
+
+  return { role, company };
+}
+
+function buildDownloadBaseName(tex, jd) {
+  const candidate = sanitizeToken(extractCandidateNameFromTex(tex), 48);
+  const { role, company } = extractRoleCompanyFromJD(jd);
+  const roleToken = sanitizeToken(role || 'target_role', 40);
+  const companyToken = sanitizeToken(company || 'target_company', 40);
+
+  const base = [candidate, roleToken, companyToken].filter(Boolean).join('__') || 'optimized_resume';
+  return base.slice(0, 120);
 }
 
 function downloadBlob(blob, name) {
@@ -31,13 +97,28 @@ export default function App() {
   const [resumeTex, setResumeTex] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [optimizedTex, setOptimizedTex] = useState('');
+  const [outputBaseName, setOutputBaseName] = useState('optimized_resume');
   const [metadata, setMetadata] = useState(null);
   const [error, setError] = useState('');
   const [compileLog, setCompileLog] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
-  const [useCanonical, setUseCanonical] = useState(false);
+  const [useCanonical, setUseCanonical] = useState(true);
   const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
+
+  const canGenerate = !!resumeTex.trim() && !!jobDescription.trim() && !isGenerating && !isCompiling;
+
+  useEffect(() => {
+    if (useCanonical) {
+      void loadCanonicalResume();
+    }
+  }, []);
+
+  const currentDownloadBaseName = useMemo(() => {
+    const sourceTex = optimizedTex || resumeTex;
+    if (!sourceTex.trim()) return 'optimized_resume';
+    return buildDownloadBaseName(sourceTex, jobDescription);
+  }, [optimizedTex, resumeTex, jobDescription]);
 
   async function onUploadFile(evt) {
     setError('');
@@ -115,13 +196,17 @@ export default function App() {
 
     try {
       const data = await generateTex(resumeTex, jobDescription);
-      setOptimizedTex(data.optimized_tex || '');
+      const nextOptimizedTex = data.optimized_tex || '';
+      const baseName = buildDownloadBaseName(nextOptimizedTex || resumeTex, jobDescription);
+
+      setOptimizedTex(nextOptimizedTex);
+      setOutputBaseName(baseName);
       setMetadata(data.metadata || null);
 
       setIsCompiling(true);
       try {
-        const pdfBlob = await compilePdf(data.optimized_tex || '');
-        downloadBlob(pdfBlob, 'optimized_resume.pdf');
+        const pdfBlob = await compilePdf(nextOptimizedTex || '');
+        downloadBlob(pdfBlob, `${baseName}.pdf`);
       } catch (compileErr) {
         setCompileLog(String(compileErr.message || compileErr));
       } finally {
@@ -146,110 +231,156 @@ export default function App() {
   function onDownloadTex() {
     if (!optimizedTex) return;
     const blob = new Blob([optimizedTex], { type: 'application/x-tex' });
-    downloadBlob(blob, makeFilename('optimized_resume', 'tex'));
+    const baseName = outputBaseName || currentDownloadBaseName;
+    downloadBlob(blob, `${baseName}.tex`);
   }
 
   return (
-    <div className="page">
-      <main className="container">
+    <div className="app-shell">
+      <header className="app-header">
         <h1>ResumeTailor MVP</h1>
-        <p className="subtitle">LaTeX-first resume optimization with ATS alignment and PDF auto-download.</p>
+        <p>LaTeX-first ATS optimization with deterministic validation.</p>
+      </header>
 
-        <section className="panel">
-          <h2>1) Resume Input</h2>
-          <label className="row">
-            <input type="checkbox" checked={useCanonical} onChange={onToggleCanonical} />
-            <span>Use canonical resume</span>
-            {useCanonical ? (
-              <button type="button" onClick={() => void loadCanonicalResume()} disabled={isLoadingCanonical}>
-                {isLoadingCanonical ? 'Loading...' : 'Reload canonical'}
-              </button>
-            ) : null}
-          </label>
-          <input type="file" accept=".tex" onChange={onUploadFile} disabled={useCanonical} />
-          <textarea
-            rows={16}
-            value={resumeTex}
-            onChange={(e) => setResumeTex(e.target.value)}
-            placeholder="Paste your full LaTeX resume here..."
-          />
-        </section>
-
-        <section className="panel">
-          <h2>2) Job Description</h2>
-          <textarea
-            rows={10}
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Paste job description text..."
-          />
-          <div className="row">
-            <button onClick={onGenerate} disabled={isGenerating || isCompiling}>
-              {isGenerating ? 'Generating...' : 'Generate'}
-            </button>
-          </div>
-        </section>
-
-        {error && (
-          <section className="panel error">
-            <h2>Error</h2>
-            <pre>{error}</pre>
+      <div className="top-grid">
+        <div className="stack">
+          <section className="card">
+            <h2>Resume Input</h2>
+            <label className="row checkbox-row">
+              <input type="checkbox" checked={useCanonical} onChange={onToggleCanonical} />
+              <span>Use canonical resume</span>
+              {useCanonical ? (
+                <button type="button" onClick={() => void loadCanonicalResume()} disabled={isLoadingCanonical}>
+                  {isLoadingCanonical ? 'Loading...' : 'Reload canonical'}
+                </button>
+              ) : null}
+            </label>
+            <input type="file" accept=".tex" onChange={onUploadFile} disabled={useCanonical} />
+            <textarea
+              rows={14}
+              value={resumeTex}
+              onChange={(e) => setResumeTex(e.target.value)}
+              placeholder="Paste your full LaTeX resume here..."
+            />
           </section>
-        )}
 
-        {optimizedTex && (
-          <section className="panel">
-            <h2>3) Optimized LaTeX (Primary Output)</h2>
+          <section className="card">
+            <h2>Job Description</h2>
+            <textarea
+              rows={10}
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste job description text..."
+            />
             <div className="row">
-              <button onClick={onCopyTex}>Copy</button>
-              <button onClick={onDownloadTex}>Download .tex</button>
-              <span className="status">
-                {isCompiling ? 'Compiling PDF...' : 'PDF compile attempted automatically.'}
-              </span>
+              <button onClick={onGenerate} disabled={!canGenerate}>
+                {isGenerating ? 'Generating...' : 'Generate'}
+              </button>
             </div>
-            <textarea rows={20} value={optimizedTex} readOnly />
-            {metadata && (
-              <div className="meta">
-                <strong>Keyword focus:</strong> {(metadata.keyword_focus || []).join(', ') || 'none'}
-                <br />
-                <strong>Removed projects:</strong> {(metadata.removed_projects || []).join(', ') || 'none'}
-                <br />
-                <strong>Optimizer:</strong> {metadata.optimizer || 'unknown'}
-                <br />
-                <strong>Key source:</strong> {metadata.key_source || 'none'}
-                {metadata.warning ? (
-                  <>
-                    <br />
-                    <strong>Warning:</strong> {metadata.warning}
-                  </>
-                ) : null}
-                {metadata.openai_error ? (
-                  <>
-                    <br />
-                    <strong>OpenAI error:</strong>{' '}
-                    {[
-                      metadata.openai_error.name,
-                      metadata.openai_error.status ? `status=${metadata.openai_error.status}` : '',
-                      metadata.openai_error.code ? `code=${metadata.openai_error.code}` : '',
-                      metadata.openai_error.type ? `type=${metadata.openai_error.type}` : '',
-                      metadata.openai_error.cause ? `cause=${metadata.openai_error.cause}` : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' | ') || metadata.openai_error.message || 'unknown'}
-                  </>
-                ) : null}
-              </div>
-            )}
           </section>
-        )}
+        </div>
 
-        {compileLog && (
-          <section className="panel error">
-            <h2>PDF Compilation Error Log</h2>
-            <pre>{compileLog}</pre>
-          </section>
-        )}
-      </main>
+        <aside className="card status-card">
+          <h2>Status</h2>
+          <div className="status-grid">
+            <div>Canonical Resume</div>
+            <strong>{useCanonical ? (isLoadingCanonical ? 'loading' : 'enabled') : 'disabled'}</strong>
+
+            <div>Generate</div>
+            <strong>{isGenerating ? 'running' : 'idle'}</strong>
+
+            <div>Compile PDF</div>
+            <strong>{isCompiling ? 'running' : 'idle'}</strong>
+
+            <div>Backend</div>
+            <code>{BACKEND_URL}</code>
+
+            <div>Output Filename</div>
+            <code>{(outputBaseName || currentDownloadBaseName) + '.pdf/.tex'}</code>
+          </div>
+
+          {metadata ? (
+            <div className="status-block">
+              <div>
+                <span>Optimizer:</span> <strong>{metadata.optimizer || 'unknown'}</strong>
+              </div>
+              <div>
+                <span>Coverage:</span>{' '}
+                <strong>
+                  {metadata.coverage_total ?? 0}/{metadata.coverage_required ?? 0}
+                </strong>
+              </div>
+              <div>
+                <span>Project count:</span> <strong>{metadata.project_count ?? 'n/a'}</strong>
+              </div>
+              <div>
+                <span>Bullet count:</span> <strong>{metadata.bullet_count ?? 'n/a'}</strong>
+              </div>
+            </div>
+          ) : null}
+        </aside>
+      </div>
+
+      {error ? (
+        <section className="card card-error">
+          <h2>Error</h2>
+          <pre>{error}</pre>
+        </section>
+      ) : null}
+
+      {optimizedTex ? (
+        <section className="card">
+          <h2>Optimized LaTeX</h2>
+          <div className="row">
+            <button onClick={onCopyTex}>Copy</button>
+            <button onClick={onDownloadTex}>Download .tex</button>
+            <span className="hint">PDF download is triggered automatically after generation.</span>
+          </div>
+          <textarea rows={22} value={optimizedTex} readOnly />
+        </section>
+      ) : null}
+
+      <details className="card debug-card">
+        <summary>Debug Panel</summary>
+        <div className="debug-grid">
+          <div>
+            <strong>Keyword focus</strong>
+            <pre>{(metadata?.keyword_focus || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Keyword coverage</strong>
+            <pre>{(metadata?.keyword_coverage || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Target support keywords</strong>
+            <pre>{(metadata?.support_keywords_target || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Removed projects</strong>
+            <pre>{(metadata?.removed_projects || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Included projects</strong>
+            <pre>{(metadata?.included_projects || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Validator failures</strong>
+            <pre>{(metadata?.validator_failures || []).join(', ') || 'none'}</pre>
+          </div>
+          <div>
+            <strong>Warning</strong>
+            <pre>{metadata?.warning || 'none'}</pre>
+          </div>
+          <div>
+            <strong>OpenAI error</strong>
+            <pre>{metadata?.openai_error ? JSON.stringify(metadata.openai_error, null, 2) : 'none'}</pre>
+          </div>
+          <div>
+            <strong>Compile log</strong>
+            <pre>{compileLog || 'none'}</pre>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

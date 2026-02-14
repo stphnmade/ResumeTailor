@@ -30,7 +30,8 @@ Candidate Resume LaTeX:
 {{RESUME_TEX}}
 
 Output requirements:
-- Keep one-page density in mind.
-- Prioritize the most relevant experience and projects for the JD.
+- Prioritize ATS language alignment while preserving truth.
+- Keep one-page density high; avoid visible underfill.
+- Explicitly include support keywords in bullets where supported by existing evidence.
 - Keep claims strictly truthful to source material.
-- Return only the required JSON object.
+- Return only the required JSON object with metadata.

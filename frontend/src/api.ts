@@ -6,7 +6,16 @@ export type GenerateTexResponse = {
   optimized_tex: string;
   metadata?: {
     removed_projects?: string[];
+    included_projects?: string[];
     keyword_focus?: string[];
+    keyword_coverage?: string[];
+    support_keywords_target?: string[];
+    coverage_required?: number;
+    coverage_total?: number;
+    project_count?: number;
+    bullet_count?: number;
+    validator_failures?: string[];
+    regeneration_attempted?: boolean;
     warning?: string;
     optimizer?: string;
     model?: string;

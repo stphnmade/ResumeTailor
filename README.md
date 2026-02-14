@@ -48,7 +48,7 @@ After deployment, frontend URL should be:
 2. Set **Root Directory** to `backend`.
 3. Deploy.
 4. In Vercel Project Settings -> Environment Variables, set:
-   - `OPENAI_KEY`
+   - `OPENAI_API_KEY`
    - `OPENAI_MODEL` (optional, e.g. `gpt-4.1-mini`)
 
 `backend/vercel.json` configures serverless function runtime settings.
