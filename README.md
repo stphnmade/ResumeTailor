@@ -11,8 +11,8 @@ This repository is split into:
 - `frontend/src/*`
 - `frontend/vite.config.js` (`base: '/ResumeTailor/'` for GitHub Pages)
 - `backend/api/health.ts`
-- `backend/api/generate-tex.js`
-- `backend/api/compile-pdf.js`
+- `backend/api/generate-tex.ts`
+- `backend/api/compile-pdf.ts`
 - `backend/vercel.json`
 - `.github/workflows/deploy-pages.yml`
 
