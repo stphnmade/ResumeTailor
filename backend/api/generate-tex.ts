@@ -173,20 +173,34 @@ export default async function handler(
     }
 
     const client = new OpenAI({ apiKey });
-    const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      temperature: 0.2,
-      input: [
-        {
-          role: "system",
-          content: [{ type: "input_text", text: systemPrompt }],
+    let response;
+    try {
+      response = await client.responses.create({
+        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+        temperature: 0.2,
+        input: [
+          {
+            role: "system",
+            content: [{ type: "input_text", text: systemPrompt }],
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: renderedUserPrompt }],
+          },
+        ],
+      });
+    } catch (openaiErr: any) {
+      return res.status(200).json({
+        optimized_tex: String(resume_tex),
+        metadata: {
+          keyword_focus: [],
+          removed_projects: [],
+          optimizer: "fallback",
+          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+          warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${String(openaiErr?.message || "unknown")}`,
         },
-        {
-          role: "user",
-          content: [{ type: "input_text", text: renderedUserPrompt }],
-        },
-      ],
-    });
+      });
+    }
 
     const parsed = extractJson(response.output_text || "");
     const optimizedTex = String(parsed?.optimized_tex || "").trim();
