@@ -1,0 +1,240 @@
+%-------------------------
+% Resume in LaTeX
+% Author: Stephen Syl-Akinwale
+% Based on a template by Jake Gutierrez (MIT License)
+%-------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+%----------FONT OPTIONS----------
+\usepackage[sfdefault]{FiraSans}
+\usepackage[default]{sourcesanspro}
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generated PDF is machine readable / ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{#1 \vspace{-2pt}}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+  \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+  \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+  \textbf{\Huge \scshape Stephen Syl-Akinwale} \\ \vspace{1pt}
+  \small
+  \href{mailto:stephensylak@gmail.com}{\underline{stephensylak@gmail.com}} $|$
+  \href{https://github.com/stphnmade}{\underline{github.com/stphnmade}} $|$
+  \href{https://linkedin.com/in/stephen-syl-akinwale}{\underline{linkedin.com/in/stephen-syl-akinwale}} $|$
+  {\underline{+1 (716)-292-5784}}
+\end{center}
+
+%-----------EDUCATION-----------
+\section{Education}
+\resumeSubHeadingListStart
+  \resumeSubheading
+    {Cornell University}{Ithaca, NY}
+    {Bachelor of Arts in Information Science (Concentration in Data Science, Interactive Technology and User Experience)}{May 2025}
+    \resumeItemListStart
+      \resumeItem{Relevant Coursework: Computing using Python, Object-Oriented Programming \& Data Structures, Functional Programming, Data Visualization, Rapid Prototyping, Learning Analytics, Data-Driven Web Development}
+    \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+\resumeSubHeadingListStart
+
+  \resumeSubheading
+    {Co-President}{May 2021 -- Sep. 2025}
+    {Cornell Music Production}{Ithaca, NY}
+    \resumeItemListStart
+      \resumeItem{Automated event scheduling workflows with \textbf{Airtable}, boosting event coordination efficiency by 40\%.}
+      \resumeItem{Directed marketing and recruitment campaigns, expanding active membership from \textbf{27 to 270+} students.}
+      \resumeItem{Materialized club members' visions to produce \textbf{3 multi-genre albums} launched across licensing platforms.}
+    \resumeItemListEnd
+
+  \resumeSubheading
+    {IT gTechnical Support}{Sep. 2023 -- May 2025}
+    {eCornell}{Remote / Ithaca, NY}
+    \resumeItemListStart
+      \resumeItem{Provided front-line technical support for 5,000+ global users, resolving 95\% of tickets within SLA through \textbf{Jamf}, \textbf{Google Admin}, \textbf{Salesforce}, and TDX.}
+      \resumeItem{Analyzed crash patterns, optimized system uptime by 18\%, and reduced ticket backlog by 22\% through automation of SQL database queries and Excel-based reporting dashboards.}
+      \resumeItem{Collaborated cross-functionally to improve onboarding workflows, decreasing average new-user setup time by 30\%.}
+      \resumeItem{Delivered in-person and remote desktop support across Windows, macOS, and mobile platforms, improving end-user satisfaction ratings.}
+    \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+%----------- PROJECTS -----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+  \resumeProjectHeading
+    {\textbf{CURide – Community Ridesharing Platform} \emph{\textbar{} Figma, Balsamiq, UX Research, Google Sheets, Agile}}
+    {Oct. 2024 -- Dec. 2024}
+    \resumeItemListStart
+      \resumeItem{Addressed affordability and safety gaps in student transportation at Cornell by designing a ridesharing platform tailored to campus needs.}
+      \resumeItem{Led a user-centered redesign after interviewing 12 students to uncover trust, role clarity, and scheduling pain points.}
+      \resumeItem{Translated interview insights into low-fidelity \textbf{Balsamiq} wireframes and high-fidelity \textbf{Figma} prototypes, iterating across 3 usability cycles.}
+      \resumeItem{Improved task completion by 33\% and reduced navigation errors by 40\%, with instructors projecting a 25\% reduction in solo car trips if deployed.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Crossing Cafe – Full-Stack Restaurant Website (Team Project)} \emph{\textbar{} HTML, CSS, JavaScript, SQLite, UX Interviews}}
+    {Mar. 2024 -- May 2024}
+    \resumeItemListStart
+      \resumeItem{A local cafe lacked a modern web presence for menu discovery and order clarity, increasing in-store friction during rush periods.}
+      \resumeItem{Partnered with a 4-person team to deliver a responsive website grounded in stakeholder requirements and customer workflows.}
+      \resumeItem{Conducted structured interviews with owners and customers, converted findings into user stories, and implemented persistent menu and order-tracking using \textbf{SQLite}.}
+      \resumeItem{Delivered an MVP that centralized menu updates, reduced ordering confusion, and demonstrated a scalable data-backed ordering workflow.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Blockopoly – Online Multiplayer Digital Card Game} \emph{\textbar{} React, TypeScript, Docker, AWS}$|$
+    \href{https://playblockopoly.com}{Live Demo}}{Jun. 2025 -- Present}
+    \resumeItemListStart
+      \resumeItem{Real-time multiplayer web games often break on refresh and struggle with low-latency synchronization across players.}
+      \resumeItem{Architect a production-ready system supporting rooms, reconnects, and synchronized turn-based state.}
+      \resumeItem{Designed a \textbf{Ktor} backend with \textbf{Redis} for ephemeral state and pub/sub, and shipped real-time updates via \textbf{Server-Sent Events (SSE)} while building a drag-and-drop \textbf{React + TypeScript} UI.}
+      \resumeItem{Eliminated polling latency, improved session stability across reloads, and established a scalable blueprint for turn-based multiplayer experiences.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Wishlist – Collaborative Gifting Platform} \emph{\textbar{} React, Go, gRPC, PostgreSQL, Docker}}
+    {Jan. 2025 -- Present}
+    \resumeItemListStart
+      \resumeItem{Group gifting coordination lacked transparency, progress tracking, and shared context across friends and families.}
+      \resumeItem{Build a full-stack wishlist product enabling users to create, share, and track gifting progress with social signals.}
+      \resumeItem{Implemented a service-oriented \textbf{Go + gRPC} backend with \textbf{PostgreSQL}, structured modular React components, and Dockerized services for local-to-cloud parity.}
+      \resumeItem{Delivered a maintainable architecture enabling rapid iteration on features like gifting history, friend sorting, and progress-based goals.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Dear Days – Family Event \& Birthday Calendar} \emph{\textbar{} Next.js, Prisma, Tailwind, Google OAuth}}
+    {Jul. 2025 -- Present}
+    \resumeItemListStart
+      \resumeItem{Families and groups frequently miss birthdays and special events due to fragmented calendars and weak reminder workflows.}
+      \resumeItem{Design a centralized, emotionally engaging system to track special days with simple sharing and clean data models.}
+      \resumeItem{Built a \textbf{Next.js} application with \textbf{Prisma} ORM, Google OAuth, and Bento-grid dashboards, using interviews with 6 families to refine onboarding and event-entry flows.}
+      \resumeItem{Created a scalable product foundation with strong retention hooks and normalized schemas that support expansion to nationwide multi-family use.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Storybot – Reddit-to-Video Automation Platform} \emph{\textbar{} Node.js, Python, FFmpeg, gTTS, Express}}
+    {Jul. 2025 -- Present}
+    \resumeItemListStart
+      \resumeItem{Short-form creators face high friction converting text stories into captioned videos with consistent pacing and narration quality.}
+      \resumeItem{Automate scraping, cleaning, narration, captioning, and audio-video composition into a repeatable pipeline.}
+      \resumeItem{Built a \textbf{Node + Python} workflow using \textbf{FFmpeg} and \textbf{gTTS}, defining modular steps for story ingestion, caption overlay, background selection, and batch processing.}
+      \resumeItem{Reduced production time from 20+ minutes to under 2 minutes per video while maintaining caption alignment and audio clarity.}
+    \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{NBA Shot Trends Analysis – 3D Court Visualization} \emph{\textbar{} R, tidyverse, ggplot2, Quarto, GitHub}}
+    {Feb. 2025 -- May 2025}
+    \resumeItemListStart
+      \resumeItem{Coaches and fans lacked a clear, visual narrative for how shot selection shifted across the modern NBA era.}
+      \resumeItem{Analyze 300k+ NBA shots (2003--2023) to identify spatial and temporal trends, including player-specific comparisons.}
+      \resumeItem{Cleaned and engineered high-volume data using \textbf{tidyverse}, mapped \texttt{loc\_x}/\texttt{loc\_y} to court zones, and generated 3D visual outputs in \textbf{Quarto}.}
+      \resumeItem{ Produced an instructor-reviewed report and reproducible workflow highlighting measurable increases in three-point dependency over time.}
+    \resumeItemListEnd
+
+    \resumeProjectHeading
+  {\textbf{OCamShips (OCaml Battleship Game)} $|$ \emph{OCaml, JavaScript, OUnit, Bisect\_ppx} $|$ 
+  \href{https://github.com/stphnmade/ocamlbattleships}{GitHub} $|$ 
+  \href{https://stphnmade.github.io/ocamlbattleships/}{Live Demo}}{Feb. 2022 -- May 2022}
+\resumeItemListStart
+  \resumeItem{Engineered a full Battleship game in OCaml with a GUI state machine (placement, battle loop, win logic) and a rules engine enforcing valid ship placement, collision detection, and hit/sunk transitions.}
+  \resumeItem{Implemented the board using a red-black tree keyed by coordinate pairs and developed multi-level AI, including a Monte Carlo-style weighted targeting algorithm for intelligent shot selection.}
+  \resumeItem{Deployed a browser edition via GitHub Pages and achieved 90\%+ test coverage on core modules using OUnit and bisect\_ppx.}
+\resumeItemListEnd
+
+
+\resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small \item {
+    \textbf{Programming Languages}{: Python, Java, JavaScript, Go, C++, OCaml, R} \\
+    \textbf{Databases}{: PostgreSQL, SQLite} \\
+    \textbf{Web / Software}{: React Native, HTML, CSS, GRPC, Git, Windows, MacOS} \\
+    \textbf{Tools \& Platforms}{: Jamf, Salesforce, Google Admin, TDX}
+  }
+\end{itemize}
+
+%-------------------------------------------
+\end{document}

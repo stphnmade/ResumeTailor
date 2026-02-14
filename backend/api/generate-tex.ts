@@ -1,4 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import OpenAI from "openai";
+import { access, readFile } from "node:fs/promises";
+import path from "node:path";
 
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
 
@@ -6,6 +9,125 @@ function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+async function firstExistingPath(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Continue.
+    }
+  }
+  return null;
+}
+
+async function resolveRulesRoot(): Promise<string> {
+  const candidates = [
+    path.resolve(process.cwd(), "source_of_truth"),
+    path.resolve(process.cwd(), "../source_of_truth"),
+    path.resolve(process.cwd(), "../../source_of_truth"),
+    path.resolve(__dirname, "../source_of_truth"),
+    path.resolve(__dirname, "../../source_of_truth"),
+    path.resolve(__dirname, "../../../source_of_truth"),
+  ];
+  const resolved = await firstExistingPath(candidates);
+  if (!resolved) {
+    throw new Error("SOURCE_OF_TRUTH_NOT_FOUND");
+  }
+  return resolved;
+}
+
+async function resolvePromptsRoot(): Promise<string> {
+  const candidates = [
+    path.resolve(process.cwd(), "lib/prompts"),
+    path.resolve(process.cwd(), "backend/lib/prompts"),
+    path.resolve(__dirname, "../lib/prompts"),
+    path.resolve(__dirname, "../../lib/prompts"),
+  ];
+  const resolved = await firstExistingPath(candidates);
+  if (!resolved) {
+    throw new Error("PROMPTS_DIRECTORY_NOT_FOUND");
+  }
+  return resolved;
+}
+
+async function loadPromptAndRules() {
+  const rulesRoot = await resolveRulesRoot();
+  const promptsRoot = await resolvePromptsRoot();
+
+  const files = {
+    tailoringRules: path.join(rulesRoot, "rules/tailoring_rules.md"),
+    allowedClaims: path.join(rulesRoot, "rules/allowed_claims.md"),
+    forbiddenClaims: path.join(rulesRoot, "rules/forbidden_claims.md"),
+    formattingRules: path.join(rulesRoot, "rules/formatting_rules.md"),
+    atsGuidance: path.join(rulesRoot, "rules/ats_keywords_guidance.md"),
+    canonicalResume: path.join(rulesRoot, "resumes/stephen_syl_akinwale__resume__source.tex"),
+    referenceJD: path.join(rulesRoot, "examples/job_descriptions/l1_engineer__incedo.txt"),
+    systemPrompt: path.join(promptsRoot, "system.md"),
+    userPrompt: path.join(promptsRoot, "user.md"),
+  };
+
+  const [
+    tailoringRules,
+    allowedClaims,
+    forbiddenClaims,
+    formattingRules,
+    atsGuidance,
+    canonicalResume,
+    referenceJD,
+    systemPrompt,
+    userPrompt,
+  ] = await Promise.all([
+    readFile(files.tailoringRules, "utf8"),
+    readFile(files.allowedClaims, "utf8"),
+    readFile(files.forbiddenClaims, "utf8"),
+    readFile(files.formattingRules, "utf8"),
+    readFile(files.atsGuidance, "utf8"),
+    readFile(files.canonicalResume, "utf8"),
+    readFile(files.referenceJD, "utf8"),
+    readFile(files.systemPrompt, "utf8"),
+    readFile(files.userPrompt, "utf8"),
+  ]);
+
+  return {
+    systemPrompt,
+    userPrompt,
+    values: {
+      TAILORING_RULES: tailoringRules,
+      ALLOWED_CLAIMS: allowedClaims,
+      FORBIDDEN_CLAIMS: forbiddenClaims,
+      FORMATTING_RULES: formattingRules,
+      ATS_KEYWORDS_GUIDANCE: atsGuidance,
+      CANONICAL_RESUME: canonicalResume,
+      REFERENCE_JOB_DESCRIPTION: referenceJD,
+    },
+  };
+}
+
+function renderTemplate(template: string, values: Record<string, string>): string {
+  let rendered = template;
+  for (const [key, value] of Object.entries(values)) {
+    rendered = rendered.split(`{{${key}}}`).join(value);
+  }
+  return rendered;
+}
+
+function extractJson(text: string): any {
+  const trimmed = (text || "").trim();
+  if (!trimmed) throw new Error("MODEL_EMPTY_RESPONSE");
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error("MODEL_JSON_PARSE_FAILED");
+    }
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
 }
 
 export default async function handler(
@@ -29,10 +151,59 @@ export default async function handler(
       return res.status(400).json({ error: "Missing input" });
     }
 
-    // Temporary stub to verify routing works
+    const { systemPrompt, userPrompt, values } = await loadPromptAndRules();
+    const renderedUserPrompt = renderTemplate(userPrompt, {
+      ...values,
+      RESUME_TEX: String(resume_tex),
+      JOB_DESCRIPTION: String(job_description),
+    });
+
+    const apiKey = process.env.OPENAI_KEY;
+    if (!apiKey) {
+      return res.status(200).json({
+        optimized_tex: String(resume_tex),
+        metadata: {
+          keyword_focus: [],
+          warning: "OPENAI_UNAVAILABLE_FALLBACK",
+        },
+      });
+    }
+
+    const client = new OpenAI({ apiKey });
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      temperature: 0.2,
+      input: [
+        {
+          role: "system",
+          content: [{ type: "input_text", text: systemPrompt }],
+        },
+        {
+          role: "user",
+          content: [{ type: "input_text", text: renderedUserPrompt }],
+        },
+      ],
+    });
+
+    const parsed = extractJson(response.output_text || "");
+    const optimizedTex = String(parsed?.optimized_tex || "").trim();
+    const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
+      ? parsed.metadata.keyword_focus.map((x: any) => String(x))
+      : [];
+    const removedProjects = Array.isArray(parsed?.metadata?.removed_projects)
+      ? parsed.metadata.removed_projects.map((x: any) => String(x))
+      : [];
+
+    if (!optimizedTex) {
+      return res.status(500).json({ error: "EMPTY_OPTIMIZED_TEX" });
+    }
+
     return res.status(200).json({
-      optimized_tex: resume_tex,
-      metadata: { keyword_focus: [] }
+      optimized_tex: optimizedTex,
+      metadata: {
+        keyword_focus: keywordFocus,
+        removed_projects: removedProjects,
+      },
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

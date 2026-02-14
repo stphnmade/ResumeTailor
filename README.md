@@ -13,6 +13,8 @@ This repository is split into:
 - `backend/api/health.ts`
 - `backend/api/generate-tex.ts`
 - `backend/api/compile-pdf.ts`
+- `backend/lib/prompts/*.md` (prompt templates loaded at runtime)
+- `source_of_truth/*` (canonical resume + tailoring rule documents + JD examples)
 - `backend/vercel.json`
 - `.github/workflows/deploy-pages.yml`
 
