@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { compilePdf, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
@@ -117,6 +118,7 @@ export default function App() {
 
   return (
     <div className="page">
+      <Analytics />
       <main className="container">
         <h1>ResumeTailor MVP</h1>
         <p className="subtitle">LaTeX-first resume optimization with ATS alignment and PDF auto-download.</p>
