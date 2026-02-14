@@ -8,6 +8,8 @@ export type GenerateTexResponse = {
     removed_projects?: string[];
     keyword_focus?: string[];
     warning?: string;
+    optimizer?: string;
+    model?: string;
   };
 };
 
@@ -48,6 +50,12 @@ export async function compilePdf(tex: string): Promise<Blob> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(String(err?.log || `Compile failed: ${res.status}`));
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/pdf')) {
+    const asText = await res.text().catch(() => '');
+    throw new Error(asText || `Compile did not return PDF (${res.status}).`);
   }
 
   return await res.blob();

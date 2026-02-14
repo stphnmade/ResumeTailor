@@ -164,6 +164,9 @@ export default async function handler(
         optimized_tex: String(resume_tex),
         metadata: {
           keyword_focus: [],
+          removed_projects: [],
+          optimizer: "fallback",
+          model: "none",
           warning: "OPENAI_UNAVAILABLE_FALLBACK",
         },
       });
@@ -203,6 +206,8 @@ export default async function handler(
       metadata: {
         keyword_focus: keywordFocus,
         removed_projects: removedProjects,
+        optimizer: "openai",
+        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       },
     });
   } catch (err: any) {

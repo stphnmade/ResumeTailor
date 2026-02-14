@@ -3,6 +3,13 @@ import { compilePdf, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
+const CANONICAL_RESUME_PATH = 'source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex';
+
+function canonicalResumeUrl() {
+  const base = import.meta.env.BASE_URL || '/';
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+  return `${normalizedBase}${CANONICAL_RESUME_PATH}`;
+}
 
 function makeFilename(prefix, ext) {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -29,6 +36,8 @@ export default function App() {
   const [compileLog, setCompileLog] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [useCanonical, setUseCanonical] = useState(false);
+  const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
 
   async function onUploadFile(evt) {
     setError('');
@@ -47,6 +56,31 @@ export default function App() {
 
     const text = await file.text();
     setResumeTex(text);
+  }
+
+  async function loadCanonicalResume() {
+    setError('');
+    setIsLoadingCanonical(true);
+    try {
+      const res = await fetch(canonicalResumeUrl(), { method: 'GET' });
+      if (!res.ok) {
+        throw new Error(`Canonical resume fetch failed: ${res.status}`);
+      }
+      const tex = await res.text();
+      setResumeTex(tex);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setIsLoadingCanonical(false);
+    }
+  }
+
+  function onToggleCanonical(evt) {
+    const checked = evt.target.checked;
+    setUseCanonical(checked);
+    if (checked) {
+      void loadCanonicalResume();
+    }
   }
 
   function validateInputs() {
@@ -123,7 +157,16 @@ export default function App() {
 
         <section className="panel">
           <h2>1) Resume Input</h2>
-          <input type="file" accept=".tex" onChange={onUploadFile} />
+          <label className="row">
+            <input type="checkbox" checked={useCanonical} onChange={onToggleCanonical} />
+            <span>Use canonical resume</span>
+            {useCanonical ? (
+              <button type="button" onClick={() => void loadCanonicalResume()} disabled={isLoadingCanonical}>
+                {isLoadingCanonical ? 'Loading...' : 'Reload canonical'}
+              </button>
+            ) : null}
+          </label>
+          <input type="file" accept=".tex" onChange={onUploadFile} disabled={useCanonical} />
           <textarea
             rows={16}
             value={resumeTex}
@@ -170,6 +213,8 @@ export default function App() {
                 <strong>Keyword focus:</strong> {(metadata.keyword_focus || []).join(', ') || 'none'}
                 <br />
                 <strong>Removed projects:</strong> {(metadata.removed_projects || []).join(', ') || 'none'}
+                <br />
+                <strong>Optimizer:</strong> {metadata.optimizer || 'unknown'}
                 {metadata.warning ? (
                   <>
                     <br />

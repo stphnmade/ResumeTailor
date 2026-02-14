@@ -36,6 +36,12 @@ jobs:
       - name: Install frontend deps
         run: npm install
 
+      - name: Copy source_of_truth into frontend/public
+        run: |
+          mkdir -p public
+          rm -rf public/source_of_truth
+          cp -R ../source_of_truth public/source_of_truth
+
       - name: Build frontend
         env:
           VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
