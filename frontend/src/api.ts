@@ -10,6 +10,15 @@ export type GenerateTexResponse = {
     warning?: string;
     optimizer?: string;
     model?: string;
+    key_source?: string;
+    openai_error?: {
+      name?: string;
+      message?: string;
+      status?: number;
+      code?: string;
+      type?: string;
+      cause?: string;
+    };
   };
 };
 

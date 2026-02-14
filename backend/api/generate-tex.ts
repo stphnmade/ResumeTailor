@@ -130,6 +130,27 @@ function extractJson(text: string): any {
   }
 }
 
+function summarizeError(err: any) {
+  const cause =
+    typeof err?.cause === "string"
+      ? err.cause
+      : String(err?.cause?.message || err?.cause || "");
+
+  return {
+    name: String(err?.name || "Error"),
+    message: String(err?.message || "unknown"),
+    status:
+      typeof err?.status === "number"
+        ? err.status
+        : typeof err?.statusCode === "number"
+          ? err.statusCode
+          : undefined,
+    code: err?.code ? String(err.code) : undefined,
+    type: err?.type ? String(err.type) : undefined,
+    cause: cause ? cause.slice(0, 240) : undefined,
+  };
+}
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -158,7 +179,12 @@ export default async function handler(
       JOB_DESCRIPTION: String(job_description),
     });
 
-    const apiKey = process.env.OPENAI_KEY;
+    const keySource = process.env.OPENAI_KEY
+      ? "OPENAI_KEY"
+      : process.env.OPENAI_API_KEY
+        ? "OPENAI_API_KEY"
+        : "none";
+    const apiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return res.status(200).json({
         optimized_tex: String(resume_tex),
@@ -168,6 +194,7 @@ export default async function handler(
           optimizer: "fallback",
           model: "none",
           warning: "OPENAI_UNAVAILABLE_FALLBACK",
+          key_source: keySource,
         },
       });
     }
@@ -190,6 +217,7 @@ export default async function handler(
         ],
       });
     } catch (openaiErr: any) {
+      const details = summarizeError(openaiErr);
       return res.status(200).json({
         optimized_tex: String(resume_tex),
         metadata: {
@@ -197,33 +225,60 @@ export default async function handler(
           removed_projects: [],
           optimizer: "fallback",
           model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-          warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${String(openaiErr?.message || "unknown")}`,
+          warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
+          key_source: keySource,
+          openai_error: details,
         },
       });
     }
 
-    const parsed = extractJson(response.output_text || "");
-    const optimizedTex = String(parsed?.optimized_tex || "").trim();
-    const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
-      ? parsed.metadata.keyword_focus.map((x: any) => String(x))
-      : [];
-    const removedProjects = Array.isArray(parsed?.metadata?.removed_projects)
-      ? parsed.metadata.removed_projects.map((x: any) => String(x))
-      : [];
+    try {
+      const parsed = extractJson(response.output_text || "");
+      const optimizedTex = String(parsed?.optimized_tex || "").trim();
+      const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
+        ? parsed.metadata.keyword_focus.map((x: any) => String(x))
+        : [];
+      const removedProjects = Array.isArray(parsed?.metadata?.removed_projects)
+        ? parsed.metadata.removed_projects.map((x: any) => String(x))
+        : [];
 
-    if (!optimizedTex) {
-      return res.status(500).json({ error: "EMPTY_OPTIMIZED_TEX" });
+      if (!optimizedTex) {
+        return res.status(200).json({
+          optimized_tex: String(resume_tex),
+          metadata: {
+            keyword_focus: [],
+            removed_projects: [],
+            optimizer: "fallback",
+            model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+            warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
+            key_source: keySource,
+          },
+        });
+      }
+
+      return res.status(200).json({
+        optimized_tex: optimizedTex,
+        metadata: {
+          keyword_focus: keywordFocus,
+          removed_projects: removedProjects,
+          optimizer: "openai",
+          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+          key_source: keySource,
+        },
+      });
+    } catch (parseErr: any) {
+      return res.status(200).json({
+        optimized_tex: String(resume_tex),
+        metadata: {
+          keyword_focus: [],
+          removed_projects: [],
+          optimizer: "fallback",
+          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+          warning: `OPENAI_INVALID_OUTPUT_FALLBACK: ${String(parseErr?.message || "unknown")}`,
+          key_source: keySource,
+        },
+      });
     }
-
-    return res.status(200).json({
-      optimized_tex: optimizedTex,
-      metadata: {
-        keyword_focus: keywordFocus,
-        removed_projects: removedProjects,
-        optimizer: "openai",
-        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      },
-    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

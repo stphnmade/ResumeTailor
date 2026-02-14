@@ -215,10 +215,27 @@ export default function App() {
                 <strong>Removed projects:</strong> {(metadata.removed_projects || []).join(', ') || 'none'}
                 <br />
                 <strong>Optimizer:</strong> {metadata.optimizer || 'unknown'}
+                <br />
+                <strong>Key source:</strong> {metadata.key_source || 'none'}
                 {metadata.warning ? (
                   <>
                     <br />
                     <strong>Warning:</strong> {metadata.warning}
+                  </>
+                ) : null}
+                {metadata.openai_error ? (
+                  <>
+                    <br />
+                    <strong>OpenAI error:</strong>{' '}
+                    {[
+                      metadata.openai_error.name,
+                      metadata.openai_error.status ? `status=${metadata.openai_error.status}` : '',
+                      metadata.openai_error.code ? `code=${metadata.openai_error.code}` : '',
+                      metadata.openai_error.type ? `type=${metadata.openai_error.type}` : '',
+                      metadata.openai_error.cause ? `cause=${metadata.openai_error.cause}` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' | ') || metadata.openai_error.message || 'unknown'}
                   </>
                 ) : null}
               </div>
