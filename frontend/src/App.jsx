@@ -1,12 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { compilePdf, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
-
-function getApiBase() {
-  const base = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  return base.endsWith('/') ? base.slice(0, -1) : base;
-}
 
 function makeFilename(prefix, ext) {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -33,8 +29,6 @@ export default function App() {
   const [compileLog, setCompileLog] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
-
-  const apiBase = useMemo(getApiBase, []);
 
   async function onUploadFile(evt) {
     setError('');
@@ -72,52 +66,6 @@ export default function App() {
     return '';
   }
 
-  async function callGenerateAPI() {
-    const res = await fetch(`${apiBase}/api/generate-tex`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        resume_tex: resumeTex,
-        job_description: jobDescription,
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || 'Failed to generate optimized LaTeX.');
-    }
-    return data;
-  }
-
-  async function callCompileAPI(tex) {
-    const res = await fetch(`${apiBase}/api/compile-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ tex }),
-    });
-
-    const contentType = res.headers.get('content-type') || '';
-    if (!res.ok) {
-      if (contentType.includes('application/json')) {
-        const data = await res.json();
-        const message = data?.error || 'PDF compilation failed.';
-        const log = data?.log || '';
-        throw new Error(log ? `${message}\n\n${log}` : message);
-      }
-      throw new Error('PDF compilation failed.');
-    }
-
-    if (!contentType.includes('application/pdf')) {
-      throw new Error('Compile endpoint did not return a PDF.');
-    }
-
-    return res.blob();
-  }
-
   async function onGenerate() {
     setError('');
     setCompileLog('');
@@ -132,13 +80,13 @@ export default function App() {
     setMetadata(null);
 
     try {
-      const data = await callGenerateAPI();
+      const data = await generateTex(resumeTex, jobDescription);
       setOptimizedTex(data.optimized_tex || '');
       setMetadata(data.metadata || null);
 
       setIsCompiling(true);
       try {
-        const pdfBlob = await callCompileAPI(data.optimized_tex || '');
+        const pdfBlob = await compilePdf(data.optimized_tex || '');
         downloadBlob(pdfBlob, 'optimized_resume.pdf');
       } catch (compileErr) {
         setCompileLog(String(compileErr.message || compileErr));

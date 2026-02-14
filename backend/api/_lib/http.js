@@ -7,23 +7,15 @@ function setJson(res, statusCode, payload) {
 }
 
 function applyCors(req, res) {
-  const allowed = [
-    'https://stphnmade.github.io',
-    'https://stphnmade.github.io/ResumeTailor',
-  ];
-  if (process.env.NODE_ENV !== 'production') {
-    allowed.push('http://localhost:5173');
-  }
+  const allowed = ['https://stphnmade.github.io'];
   const origin = req.headers.origin || '';
-  const referer = req.headers.referer || '';
-  const refererAllowed = referer.startsWith('https://stphnmade.github.io/ResumeTailor');
-  const originAllowed = allowed.includes(origin) || origin === 'https://stphnmade.github.io' || refererAllowed;
+  const originAllowed = allowed.includes(origin);
 
   if (originAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Origin', 'https://stphnmade.github.io');
   }
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {

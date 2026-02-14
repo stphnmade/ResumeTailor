@@ -20,8 +20,8 @@ This repository is split into:
 
 - Never commit secrets.
 - Only commit `.env.example`.
-- `OPENAI_API_KEY` is backend-only and must be set in Vercel Environment Variables.
-- Do not put `OPENAI_API_KEY` in frontend code or frontend env vars.
+- OpenAI secrets are backend-only and must be set in Vercel Environment Variables.
+- Do not put OpenAI secrets in frontend code or frontend env vars.
 
 ## Frontend Deployment (GitHub Pages)
 
@@ -33,7 +33,7 @@ It:
 2. Builds `frontend/dist`
 3. Deploys `frontend/dist` to GitHub Pages
 
-Set repository variable `VITE_API_BASE_URL` to your deployed Vercel backend origin (for example `https://your-backend.vercel.app`).
+Set repository variable `VITE_BACKEND_URL` to your deployed Vercel backend origin (for example `https://your-backend.vercel.app`).
 
 After deployment, frontend URL should be:
 
@@ -45,7 +45,7 @@ After deployment, frontend URL should be:
 2. Set **Root Directory** to `backend`.
 3. Deploy.
 4. In Vercel Project Settings -> Environment Variables, set:
-   - `OPENAI_API_KEY`
+   - `OPENAI_KEY`
    - `OPENAI_MODEL` (optional, e.g. `gpt-4.1-mini`)
 
 `backend/vercel.json` configures serverless function runtime settings.
@@ -58,6 +58,6 @@ After deployment, frontend URL should be:
 2. Frontend page loads at:
    - `https://stphnmade.github.io/ResumeTailor/`
 3. Frontend can call backend:
-   - Trigger Generate flow and confirm API requests target `VITE_API_BASE_URL`
+   - Trigger Generate flow and confirm API requests target `VITE_BACKEND_URL`
 4. Confirm no secret leakage:
-   - Search frontend for `OPENAI_API_KEY` (should be none)
+   - Search frontend for OpenAI secret names (should be none)

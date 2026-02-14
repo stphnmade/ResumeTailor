@@ -1,5 +1,5 @@
 function getClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_KEY;
   if (!apiKey) return null;
   let OpenAI;
   try {
