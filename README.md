@@ -50,7 +50,7 @@ After deployment, frontend URL should be:
 4. In Vercel Project Settings -> Environment Variables, set:
    - `OPENAI_API_KEY`
    - `OPENAI_MODEL` (optional, e.g. `gpt-4.1-mini`)
-   - `LATEX_REMOTE_FALLBACK` (optional, set to `true` to enable remote PDF compile fallback when local `tectonic` is unavailable)
+   - `LATEX_REMOTE_FALLBACK` (optional, defaults to enabled; set to `false` to disable remote PDF fallback when local `tectonic` is unavailable)
    - `LATEXONLINE_BASE_URL` (optional, defaults to `https://texlive2020.latexonline.cc`)
 
 `backend/vercel.json` configures serverless function runtime settings.

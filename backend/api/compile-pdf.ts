@@ -10,7 +10,7 @@ const COMPILE_TIMEOUT_MS = 20_000;
 const ARCHIVE_TIMEOUT_MS = 8_000;
 const REMOTE_COMPILE_TIMEOUT_MS = 25_000;
 const REMOTE_FALLBACK_ENABLED =
-  String(process.env.LATEX_REMOTE_FALLBACK || "").toLowerCase() === "true";
+  String(process.env.LATEX_REMOTE_FALLBACK || "true").toLowerCase() !== "false";
 const LATEXONLINE_BASE_URL = (
   process.env.LATEXONLINE_BASE_URL || "https://texlive2020.latexonline.cc"
 ).replace(/\/$/, "");
