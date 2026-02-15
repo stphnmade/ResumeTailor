@@ -7,6 +7,13 @@ import path from "node:path";
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
 const MAX_TEX_BYTES = 250 * 1024;
 const COMPILE_TIMEOUT_MS = 20_000;
+const ARCHIVE_TIMEOUT_MS = 8_000;
+const REMOTE_COMPILE_TIMEOUT_MS = 25_000;
+const REMOTE_FALLBACK_ENABLED =
+  String(process.env.LATEX_REMOTE_FALLBACK || "").toLowerCase() === "true";
+const LATEXONLINE_BASE_URL = (
+  process.env.LATEXONLINE_BASE_URL || "https://texlive2020.latexonline.cc"
+).replace(/\/$/, "");
 
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
@@ -22,10 +29,14 @@ type CommandResult = {
   timedOut: boolean;
 };
 
-function runTectonic(workDir: string, texFileName: string): Promise<CommandResult> {
+function runCommand(
+  command: string,
+  args: string[],
+  workDir: string,
+  timeoutMs: number
+): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    const args = ["--keep-logs", "--outdir", workDir, texFileName];
-    const child = spawn("tectonic", args, { cwd: workDir });
+    const child = spawn(command, args, { cwd: workDir });
 
     let stdout = "";
     let stderr = "";
@@ -34,7 +45,7 @@ function runTectonic(workDir: string, texFileName: string): Promise<CommandResul
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
-    }, COMPILE_TIMEOUT_MS);
+    }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
       stdout += String(chunk);
@@ -60,6 +71,86 @@ function runTectonic(workDir: string, texFileName: string): Promise<CommandResul
       });
     });
   });
+}
+
+function runTectonic(workDir: string, texFileName: string): Promise<CommandResult> {
+  return runCommand(
+    "tectonic",
+    ["--keep-logs", "--outdir", workDir, texFileName],
+    workDir,
+    COMPILE_TIMEOUT_MS
+  );
+}
+
+async function createTarball(workDir: string, texFileName: string): Promise<Buffer> {
+  const tarballName = "source.tar.bz2";
+  const tarballPath = path.join(workDir, tarballName);
+  const tarResult = await runCommand(
+    "tar",
+    ["-cjf", tarballName, texFileName],
+    workDir,
+    ARCHIVE_TIMEOUT_MS
+  );
+
+  if (tarResult.timedOut) {
+    throw new Error(`Tarball creation timed out after ${ARCHIVE_TIMEOUT_MS}ms.`);
+  }
+
+  if (tarResult.code !== 0) {
+    throw new Error(
+      `Tarball creation failed with code ${tarResult.code}: ${tarResult.stderr || tarResult.stdout}`
+    );
+  }
+
+  return await readFile(tarballPath);
+}
+
+async function compileWithRemoteLatexOnline(
+  workDir: string,
+  texFileName: string
+): Promise<Buffer> {
+  const archive = await createTarball(workDir, texFileName);
+  const form = new FormData();
+  form.set(
+    "file",
+    new Blob([archive], { type: "application/x-bzip2" }),
+    "source.tar.bz2"
+  );
+
+  const target = encodeURIComponent(texFileName);
+  const url = `${LATEXONLINE_BASE_URL}/data?target=${target}&command=pdflatex&force=true`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REMOTE_COMPILE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+      redirect: "follow",
+    });
+
+    const body = Buffer.from(await response.arrayBuffer());
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+    if (!response.ok) {
+      throw new Error(
+        `Remote compiler returned ${response.status}: ${body.toString("utf8").slice(0, 8000)}`
+      );
+    }
+
+    if (!contentType.includes("application/pdf")) {
+      throw new Error(
+        `Remote compiler did not return PDF (${contentType || "unknown"}): ${body
+          .toString("utf8")
+          .slice(0, 8000)}`
+      );
+    }
+
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function trimLog(text: string, maxChars = 12000): string {
@@ -111,9 +202,39 @@ export default async function handler(
       result = await runTectonic(workDir, "resume.tex");
     } catch (spawnErr: any) {
       const spawnMessage = String(spawnErr?.message || "Failed to start tectonic process.");
+
+      const isMissingTectonic =
+        String(spawnErr?.code || "").toUpperCase() === "ENOENT" ||
+        /\bENOENT\b/i.test(spawnMessage);
+
+      if (isMissingTectonic && REMOTE_FALLBACK_ENABLED) {
+        try {
+          const remotePdf = await compileWithRemoteLatexOnline(workDir, "resume.tex");
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", 'attachment; filename="optimized_resume.pdf"');
+          return res.end(remotePdf);
+        } catch (remoteErr: any) {
+          return res.status(500).json({
+            error: "LATEX_COMPILE_FAILED",
+            log: trimLog(
+              `Local compiler missing (tectonic ENOENT). Remote fallback failed.\n${String(
+                remoteErr?.message || remoteErr || "Unknown remote compile error"
+              )}`
+            ),
+          });
+        }
+      }
+
       return res.status(500).json({
         error: "LATEX_COMPILE_FAILED",
-        log: trimLog(`Tectonic process failed to start. ${spawnMessage}`),
+        log: trimLog(
+          `Tectonic process failed to start. ${spawnMessage}${
+            isMissingTectonic && !REMOTE_FALLBACK_ENABLED
+              ? "\nRemote fallback is disabled. Set LATEX_REMOTE_FALLBACK=true to enable remote compile."
+              : ""
+          }`
+        ),
       });
     }
 
