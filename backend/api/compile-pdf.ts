@@ -13,6 +13,10 @@ const REMOTE_FALLBACK_ENABLED =
 const LATEXONLINE_BASE_URL = (
   process.env.LATEXONLINE_BASE_URL || "https://texlive2020.latexonline.cc"
 ).replace(/\/$/, "");
+const REMOTE_QUERY_URL_MAX_LEN = 120_000;
+const REMOTE_FALLBACK_HOSTS = Array.from(
+  new Set([LATEXONLINE_BASE_URL, "https://latexonline.cc"])
+);
 
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
@@ -126,26 +130,13 @@ function buildSingleFileTar(fileName: string, content: Buffer): Buffer {
   return Buffer.concat([header, content, contentPadding, eofPadding]);
 }
 
-async function compileWithRemoteLatexOnline(workDir: string, texFileName: string): Promise<Buffer> {
-  const texPath = path.join(workDir, texFileName);
-  const tex = await readFile(texPath);
-  const archive = buildSingleFileTar(texFileName, tex);
-  const form = new FormData();
-  form.set(
-    "file",
-    new Blob([archive], { type: "application/x-tar" }),
-    "source.tar"
-  );
-
-  const target = encodeURIComponent(texFileName);
-  const url = `${LATEXONLINE_BASE_URL}/data?target=${target}&command=pdflatex&force=true`;
+async function fetchRemotePdf(url: string, init: RequestInit, label: string): Promise<Buffer> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REMOTE_COMPILE_TIMEOUT_MS);
 
   try {
     const response = await fetch(url, {
-      method: "POST",
-      body: form,
+      ...init,
       signal: controller.signal,
       redirect: "follow",
     });
@@ -155,13 +146,13 @@ async function compileWithRemoteLatexOnline(workDir: string, texFileName: string
 
     if (!response.ok) {
       throw new Error(
-        `Remote compiler returned ${response.status}: ${body.toString("utf8").slice(0, 8000)}`
+        `${label} returned ${response.status}: ${body.toString("utf8").slice(0, 8000)}`
       );
     }
 
     if (!contentType.includes("application/pdf")) {
       throw new Error(
-        `Remote compiler did not return PDF (${contentType || "unknown"}): ${body
+        `${label} did not return PDF (${contentType || "unknown"}): ${body
           .toString("utf8")
           .slice(0, 8000)}`
       );
@@ -171,6 +162,61 @@ async function compileWithRemoteLatexOnline(workDir: string, texFileName: string
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function compileWithRemoteDataEndpoint(
+  baseUrl: string,
+  texFileName: string,
+  texBuffer: Buffer
+): Promise<Buffer> {
+  const archive = buildSingleFileTar(texFileName, texBuffer);
+  const form = new FormData();
+  form.set(
+    "file",
+    new Blob([archive], { type: "application/x-tar" }),
+    "source.tar"
+  );
+
+  const target = encodeURIComponent(texFileName);
+  const url = `${baseUrl}/data?target=${target}&command=pdflatex&force=true`;
+  return await fetchRemotePdf(url, { method: "POST", body: form }, `${baseUrl}/data`);
+}
+
+async function compileWithRemoteQueryEndpoint(baseUrl: string, tex: string): Promise<Buffer> {
+  const encodedTex = encodeURIComponent(tex);
+  const url = `${baseUrl}/compile?text=${encodedTex}`;
+  if (url.length > REMOTE_QUERY_URL_MAX_LEN) {
+    throw new Error(
+      `${baseUrl}/compile URL exceeds ${REMOTE_QUERY_URL_MAX_LEN} characters (${url.length}).`
+    );
+  }
+
+  return await fetchRemotePdf(url, { method: "GET" }, `${baseUrl}/compile`);
+}
+
+async function compileWithRemoteLatexOnline(workDir: string, texFileName: string): Promise<Buffer> {
+  const texPath = path.join(workDir, texFileName);
+  const texBuffer = await readFile(texPath);
+  const tex = texBuffer.toString("utf8");
+  const errors: string[] = [];
+
+  for (const baseUrl of REMOTE_FALLBACK_HOSTS) {
+    try {
+      return await compileWithRemoteDataEndpoint(baseUrl, texFileName, texBuffer);
+    } catch (err: any) {
+      errors.push(String(err?.message || err || `${baseUrl}/data failed`));
+    }
+  }
+
+  for (const baseUrl of REMOTE_FALLBACK_HOSTS) {
+    try {
+      return await compileWithRemoteQueryEndpoint(baseUrl, tex);
+    } catch (err: any) {
+      errors.push(String(err?.message || err || `${baseUrl}/compile failed`));
+    }
+  }
+
+  throw new Error(errors.join("\n"));
 }
 
 function trimLog(text: string, maxChars = 12000): string {
