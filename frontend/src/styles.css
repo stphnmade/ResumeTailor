@@ -115,16 +115,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.ghost-btn {
-  background: #fff;
-  color: var(--accent);
-}
-
-.ghost-btn.active {
-  background: var(--accent);
-  color: #fff;
-}
-
 .hint {
   color: var(--muted);
   font-size: 0.9rem;
@@ -190,16 +180,6 @@ pre {
   font-size: 0.83rem;
   line-height: 1.35;
   color: var(--muted);
-}
-
-.tex-preview {
-  max-height: 460px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
-  color: var(--text);
 }
 
 .pdf-preview {

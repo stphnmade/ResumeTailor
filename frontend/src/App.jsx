@@ -113,7 +113,6 @@ export default function App() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [useCanonical, setUseCanonical] = useState(true);
   const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
-  const [previewMode, setPreviewMode] = useState('source');
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
   const [pdfPreviewFilename, setPdfPreviewFilename] = useState('optimized_resume.pdf');
   const pdfPreviewUrlRef = useRef('');
@@ -240,7 +239,6 @@ export default function App() {
       const baseName = buildDownloadBaseName(nextOptimizedTex || resumeTex, jobDescription);
 
       setOptimizedTex(nextOptimizedTex);
-      setPreviewMode('optimized');
       setOutputBaseName(baseName);
       setMetadata(data.metadata || null);
 
@@ -285,11 +283,6 @@ export default function App() {
     a.click();
     a.remove();
   }
-
-  const previewTex =
-    previewMode === 'optimized' && optimizedTex
-      ? optimizedTex
-      : resumeTex;
 
   return (
     <div className="app-shell">
@@ -418,31 +411,6 @@ export default function App() {
         ) : (
           <div className="empty-preview">No PDF preview yet.</div>
         )}
-      </section>
-
-      <section className="card">
-        <h2>TeX Preview</h2>
-        <div className="row">
-          <button
-            type="button"
-            className={`ghost-btn ${previewMode === 'source' ? 'active' : ''}`}
-            onClick={() => setPreviewMode('source')}
-          >
-            Source
-          </button>
-          <button
-            type="button"
-            className={`ghost-btn ${previewMode === 'optimized' ? 'active' : ''}`}
-            onClick={() => setPreviewMode('optimized')}
-            disabled={!optimizedTex}
-          >
-            Optimized
-          </button>
-          <span className="hint">
-            {previewMode === 'optimized' ? 'Showing generated .tex' : 'Showing source .tex'}
-          </span>
-        </div>
-        <pre className="tex-preview">{previewTex || 'No TeX available yet.'}</pre>
       </section>
 
       <details className="card debug-card">
