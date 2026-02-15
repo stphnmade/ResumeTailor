@@ -93,6 +93,14 @@ function downloadBlob(blob, name) {
   URL.revokeObjectURL(url);
 }
 
+function summarizeTokens(tokens) {
+  if (!tokens) return '0 in / 0 out / 0 total';
+  const input = Number(tokens.input_tokens || 0);
+  const output = Number(tokens.output_tokens || 0);
+  const total = Number(tokens.total_tokens || input + output || 0);
+  return `${input} in / ${output} out / ${total} total`;
+}
+
 export default function App() {
   const [resumeTex, setResumeTex] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -316,6 +324,9 @@ export default function App() {
               <div>
                 <span>Bullet count:</span> <strong>{metadata.bullet_count ?? 'n/a'}</strong>
               </div>
+              <div>
+                <span>Tokens:</span> <strong>{summarizeTokens(metadata.openai_tokens?.total)}</strong>
+              </div>
             </div>
           ) : null}
         </aside>
@@ -374,6 +385,22 @@ export default function App() {
           <div>
             <strong>OpenAI error</strong>
             <pre>{metadata?.openai_error ? JSON.stringify(metadata.openai_error, null, 2) : 'none'}</pre>
+          </div>
+          <div>
+            <strong>OpenAI response id</strong>
+            <pre>{metadata?.openai_response_id || 'none'}</pre>
+          </div>
+          <div>
+            <strong>OpenAI tokens (pass 1)</strong>
+            <pre>{metadata?.openai_tokens?.pass_1 ? JSON.stringify(metadata.openai_tokens.pass_1, null, 2) : 'none'}</pre>
+          </div>
+          <div>
+            <strong>OpenAI tokens (pass 2)</strong>
+            <pre>{metadata?.openai_tokens?.pass_2 ? JSON.stringify(metadata.openai_tokens.pass_2, null, 2) : 'none'}</pre>
+          </div>
+          <div>
+            <strong>OpenAI tokens (total)</strong>
+            <pre>{metadata?.openai_tokens?.total ? JSON.stringify(metadata.openai_tokens.total, null, 2) : 'none'}</pre>
           </div>
           <div>
             <strong>Compile log</strong>

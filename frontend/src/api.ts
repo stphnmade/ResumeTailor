@@ -20,6 +20,30 @@ export type GenerateTexResponse = {
     optimizer?: string;
     model?: string;
     key_source?: string;
+    openai_response_id?: string;
+    openai_tokens?: {
+      pass_1?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+      pass_2?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+      total?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+    };
     openai_error?: {
       name?: string;
       message?: string;

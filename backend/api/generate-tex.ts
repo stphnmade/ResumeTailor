@@ -12,6 +12,20 @@ type ModelPayload = {
   includedProjects: string[];
 };
 
+type TokenUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cached_input_tokens?: number;
+  reasoning_output_tokens?: number;
+};
+
+type OptimizationPassResult = {
+  payload: ModelPayload;
+  usage: TokenUsage;
+  responseId?: string;
+};
+
 type ValidationResult = {
   ok: boolean;
   failures: string[];
@@ -293,6 +307,26 @@ function summarizeError(err: any) {
   };
 }
 
+function zeroTokenUsage(): TokenUsage {
+  return {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    cached_input_tokens: 0,
+    reasoning_output_tokens: 0,
+  };
+}
+
+function addTokenUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    input_tokens: (a.input_tokens || 0) + (b.input_tokens || 0),
+    output_tokens: (a.output_tokens || 0) + (b.output_tokens || 0),
+    total_tokens: (a.total_tokens || 0) + (b.total_tokens || 0),
+    cached_input_tokens: (a.cached_input_tokens || 0) + (b.cached_input_tokens || 0),
+    reasoning_output_tokens: (a.reasoning_output_tokens || 0) + (b.reasoning_output_tokens || 0),
+  };
+}
+
 function parseModelPayload(parsed: any): ModelPayload {
   const optimizedTex = String(parsed?.optimized_tex || "").trim();
   const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
@@ -319,7 +353,7 @@ async function runOptimizationPass(
   systemPrompt: string,
   baseUserPrompt: string,
   correctionMessage?: string
-): Promise<ModelPayload> {
+): Promise<OptimizationPassResult> {
   const effectiveUserPrompt = correctionMessage
     ? `${baseUserPrompt}\n\n[REGENERATION_CORRECTION]\n${correctionMessage}`
     : baseUserPrompt;
@@ -340,7 +374,24 @@ async function runOptimizationPass(
   });
 
   const parsed = extractJson(response.output_text || "");
-  return parseModelPayload(parsed);
+  const usageRaw: any = (response as any)?.usage || {};
+  const inputTokens = Number(usageRaw?.input_tokens ?? usageRaw?.prompt_tokens ?? 0) || 0;
+  const outputTokens = Number(usageRaw?.output_tokens ?? usageRaw?.completion_tokens ?? 0) || 0;
+  const totalTokens = Number(usageRaw?.total_tokens ?? (inputTokens + outputTokens)) || 0;
+  const cachedInputTokens = Number(usageRaw?.input_tokens_details?.cached_tokens ?? 0) || 0;
+  const reasoningOutputTokens = Number(usageRaw?.output_tokens_details?.reasoning_tokens ?? 0) || 0;
+
+  return {
+    payload: parseModelPayload(parsed),
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+      cached_input_tokens: cachedInputTokens,
+      reasoning_output_tokens: reasoningOutputTokens,
+    },
+    responseId: (response as any)?.id ? String((response as any).id) : undefined,
+  };
 }
 
 export default async function handler(
@@ -394,13 +445,17 @@ export default async function handler(
           model: "none",
           warning: "OPENAI_UNAVAILABLE_FALLBACK",
           key_source: keySource,
+          openai_tokens: {
+            pass_1: zeroTokenUsage(),
+            total: zeroTokenUsage(),
+          },
         },
       });
     }
 
     const client = new OpenAI({ apiKey });
 
-    let firstPass: ModelPayload;
+    let firstPass: OptimizationPassResult;
     try {
       firstPass = await runOptimizationPass(client, model, systemPrompt, renderedUserPrompt);
     } catch (openaiErr: any) {
@@ -420,11 +475,15 @@ export default async function handler(
           warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
           key_source: keySource,
           openai_error: details,
+          openai_tokens: {
+            pass_1: zeroTokenUsage(),
+            total: zeroTokenUsage(),
+          },
         },
       });
     }
 
-    if (!firstPass.optimizedTex) {
+    if (!firstPass.payload.optimizedTex) {
       return res.status(200).json({
         optimized_tex: sourceResumeTex,
         metadata: {
@@ -439,14 +498,22 @@ export default async function handler(
           model,
           warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
           key_source: keySource,
+          openai_response_id: firstPass.responseId,
+          openai_tokens: {
+            pass_1: firstPass.usage,
+            total: firstPass.usage,
+          },
         },
       });
     }
 
-    let finalOutput = firstPass;
-    let validation = validateOptimization(firstPass.optimizedTex, supportKeywordTargets);
+    let finalOutput = firstPass.payload;
+    let validation = validateOptimization(firstPass.payload.optimizedTex, supportKeywordTargets);
     let regenerationAttempted = false;
     let regenerationFailedMessage = "";
+    let finalResponseId = firstPass.responseId;
+    let secondPassUsage: TokenUsage | undefined;
+    let totalTokenUsage = addTokenUsage(zeroTokenUsage(), firstPass.usage);
 
     if (!validation.ok) {
       regenerationAttempted = true;
@@ -459,9 +526,13 @@ export default async function handler(
           renderedUserPrompt,
           correctionMessage
         );
-        if (secondPass.optimizedTex) {
-          finalOutput = secondPass;
-          validation = validateOptimization(secondPass.optimizedTex, supportKeywordTargets);
+        secondPassUsage = secondPass.usage;
+        finalResponseId = secondPass.responseId || finalResponseId;
+        totalTokenUsage = addTokenUsage(totalTokenUsage, secondPass.usage);
+
+        if (secondPass.payload.optimizedTex) {
+          finalOutput = secondPass.payload;
+          validation = validateOptimization(secondPass.payload.optimizedTex, supportKeywordTargets);
         }
       } catch (retryErr: any) {
         const retryDetails = summarizeError(retryErr);
@@ -495,6 +566,12 @@ export default async function handler(
         model,
         warning: warnings.length ? warnings.join(" | ") : undefined,
         key_source: keySource,
+        openai_response_id: finalResponseId,
+        openai_tokens: {
+          pass_1: firstPass.usage,
+          pass_2: secondPassUsage,
+          total: totalTokenUsage,
+        },
       },
     });
   } catch (err: any) {
