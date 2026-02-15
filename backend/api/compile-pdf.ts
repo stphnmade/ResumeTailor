@@ -7,7 +7,6 @@ import path from "node:path";
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
 const MAX_TEX_BYTES = 250 * 1024;
 const COMPILE_TIMEOUT_MS = 20_000;
-const ARCHIVE_TIMEOUT_MS = 8_000;
 const REMOTE_COMPILE_TIMEOUT_MS = 25_000;
 const REMOTE_FALLBACK_ENABLED =
   String(process.env.LATEX_REMOTE_FALLBACK || "true").toLowerCase() !== "false";
@@ -82,39 +81,60 @@ function runTectonic(workDir: string, texFileName: string): Promise<CommandResul
   );
 }
 
-async function createTarball(workDir: string, texFileName: string): Promise<Buffer> {
-  const tarballName = "source.tar.bz2";
-  const tarballPath = path.join(workDir, tarballName);
-  const tarResult = await runCommand(
-    "tar",
-    ["-cjf", tarballName, texFileName],
-    workDir,
-    ARCHIVE_TIMEOUT_MS
-  );
-
-  if (tarResult.timedOut) {
-    throw new Error(`Tarball creation timed out after ${ARCHIVE_TIMEOUT_MS}ms.`);
-  }
-
-  if (tarResult.code !== 0) {
-    throw new Error(
-      `Tarball creation failed with code ${tarResult.code}: ${tarResult.stderr || tarResult.stdout}`
-    );
-  }
-
-  return await readFile(tarballPath);
+function writeTarString(target: Buffer, value: string, offset: number, maxBytes: number) {
+  const bytes = Buffer.from(value, "utf8");
+  const length = Math.min(bytes.length, maxBytes);
+  bytes.copy(target, offset, 0, length);
 }
 
-async function compileWithRemoteLatexOnline(
-  workDir: string,
-  texFileName: string
-): Promise<Buffer> {
-  const archive = await createTarball(workDir, texFileName);
+function writeTarOctal(
+  target: Buffer,
+  value: number,
+  offset: number,
+  width: number,
+  withTrailingSpace = false
+) {
+  const suffix = withTrailingSpace ? "\0 " : "\0";
+  const digits = Math.max(1, width - suffix.length);
+  const octal = value.toString(8).slice(-digits).padStart(digits, "0");
+  writeTarString(target, `${octal}${suffix}`, offset, width);
+}
+
+function buildSingleFileTar(fileName: string, content: Buffer): Buffer {
+  const header = Buffer.alloc(512, 0);
+  const now = Math.floor(Date.now() / 1000);
+
+  writeTarString(header, fileName, 0, 100);
+  writeTarOctal(header, 0o644, 100, 8);
+  writeTarOctal(header, 0, 108, 8);
+  writeTarOctal(header, 0, 116, 8);
+  writeTarOctal(header, content.length, 124, 12);
+  writeTarOctal(header, now, 136, 12);
+  writeTarString(header, "        ", 148, 8);
+  writeTarString(header, "0", 156, 1);
+  writeTarString(header, "ustar\0", 257, 6);
+  writeTarString(header, "00", 263, 2);
+  writeTarString(header, "root", 265, 32);
+  writeTarString(header, "root", 297, 32);
+
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  writeTarOctal(header, checksum, 148, 8, true);
+
+  const contentPadBytes = (512 - (content.length % 512)) % 512;
+  const contentPadding = Buffer.alloc(contentPadBytes, 0);
+  const eofPadding = Buffer.alloc(1024, 0);
+  return Buffer.concat([header, content, contentPadding, eofPadding]);
+}
+
+async function compileWithRemoteLatexOnline(workDir: string, texFileName: string): Promise<Buffer> {
+  const texPath = path.join(workDir, texFileName);
+  const tex = await readFile(texPath);
+  const archive = buildSingleFileTar(texFileName, tex);
   const form = new FormData();
   form.set(
     "file",
-    new Blob([archive], { type: "application/x-bzip2" }),
-    "source.tar.bz2"
+    new Blob([archive], { type: "application/x-tar" }),
+    "source.tar"
   );
 
   const target = encodeURIComponent(texFileName);
