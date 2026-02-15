@@ -202,6 +202,24 @@ pre {
   color: var(--text);
 }
 
+.pdf-preview {
+  width: 100%;
+  min-height: 680px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.empty-preview {
+  min-height: 120px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: #fcfdff;
+}
+
 @media (max-width: 980px) {
   .top-grid {
     grid-template-columns: 1fr;

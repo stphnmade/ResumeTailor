@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BACKEND_URL, compilePdf, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
@@ -114,6 +114,9 @@ export default function App() {
   const [useCanonical, setUseCanonical] = useState(true);
   const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
   const [previewMode, setPreviewMode] = useState('source');
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
+  const [pdfPreviewFilename, setPdfPreviewFilename] = useState('optimized_resume.pdf');
+  const pdfPreviewUrlRef = useRef('');
 
   const canGenerate = !!resumeTex.trim() && !!jobDescription.trim() && !isGenerating && !isCompiling;
 
@@ -121,6 +124,14 @@ export default function App() {
     if (useCanonical) {
       void loadCanonicalResume();
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      }
+    };
   }, []);
 
   const currentDownloadBaseName = useMemo(() => {
@@ -190,9 +201,29 @@ export default function App() {
     return '';
   }
 
+  function setPdfPreview(blob, filename) {
+    const nextUrl = URL.createObjectURL(blob);
+    if (pdfPreviewUrlRef.current) {
+      URL.revokeObjectURL(pdfPreviewUrlRef.current);
+    }
+    pdfPreviewUrlRef.current = nextUrl;
+    setPdfPreviewUrl(nextUrl);
+    setPdfPreviewFilename(filename);
+  }
+
+  function clearPdfPreview() {
+    if (pdfPreviewUrlRef.current) {
+      URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      pdfPreviewUrlRef.current = '';
+    }
+    setPdfPreviewUrl('');
+    setPdfPreviewFilename('optimized_resume.pdf');
+  }
+
   async function onGenerate() {
     setError('');
     setCompileLog('');
+    clearPdfPreview();
 
     const invalid = validateInputs();
     if (invalid) {
@@ -216,7 +247,7 @@ export default function App() {
       setIsCompiling(true);
       try {
         const pdfBlob = await compilePdf(nextOptimizedTex || '');
-        downloadBlob(pdfBlob, `${baseName}.pdf`);
+        setPdfPreview(pdfBlob, `${baseName}.pdf`);
       } catch (compileErr) {
         setCompileLog(String(compileErr.message || compileErr));
       } finally {
@@ -243,6 +274,16 @@ export default function App() {
     const blob = new Blob([optimizedTex], { type: 'application/x-tex' });
     const baseName = outputBaseName || currentDownloadBaseName;
     downloadBlob(blob, `${baseName}.tex`);
+  }
+
+  function onDownloadPdf() {
+    if (!pdfPreviewUrl) return;
+    const a = document.createElement('a');
+    a.href = pdfPreviewUrl;
+    a.download = pdfPreviewFilename || 'optimized_resume.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   const previewTex =
@@ -352,11 +393,32 @@ export default function App() {
           <div className="row">
             <button onClick={onCopyTex}>Copy</button>
             <button onClick={onDownloadTex}>Download .tex</button>
-            <span className="hint">PDF download is triggered automatically after generation.</span>
+            <span className="hint">Compile uses optimized .tex only.</span>
           </div>
           <textarea rows={22} value={optimizedTex} readOnly />
         </section>
       ) : null}
+
+      <section className="card">
+        <h2>PDF Preview (Optimized .tex)</h2>
+        <div className="row">
+          <button onClick={onDownloadPdf} disabled={!pdfPreviewUrl}>
+            Download .pdf
+          </button>
+          <span className="hint">
+            {isCompiling
+              ? 'Compiling optimized .tex...'
+              : pdfPreviewUrl
+                ? `Preview ready: ${pdfPreviewFilename}`
+                : 'Generate optimized .tex to build preview.'}
+          </span>
+        </div>
+        {pdfPreviewUrl ? (
+          <iframe title="Optimized PDF Preview" className="pdf-preview" src={pdfPreviewUrl} />
+        ) : (
+          <div className="empty-preview">No PDF preview yet.</div>
+        )}
+      </section>
 
       <section className="card">
         <h2>TeX Preview</h2>
