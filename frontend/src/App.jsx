@@ -21,6 +21,14 @@ function sanitizeToken(value, maxLen = 40) {
     .slice(0, maxLen);
 }
 
+function cleanJobText(value) {
+  return String(value || '')
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function extractCandidateNameFromTex(tex) {
   const headerMatch = tex.match(/\{\\Huge\s+\\scshape\s+([^}]*)\}/);
   if (headerMatch?.[1]) {
@@ -35,30 +43,59 @@ function extractCandidateNameFromTex(tex) {
 }
 
 function extractRoleCompanyFromJD(jd) {
+  const jdText = cleanJobText(jd);
   const lines = String(jd || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
 
-  let role = '';
-  const descriptionIndex = lines.findIndex((line) => /^description$/i.test(line));
-  if (descriptionIndex !== -1 && lines[descriptionIndex + 1]) role = lines[descriptionIndex + 1];
-
-  if (!role) {
-    role =
-      lines.find(
-        (line) =>
-          !/location|workplace|about the role|responsibilities|required skills|qualifications/i.test(line)
-      ) || '';
+  let company = '';
+  const companyPatterns = [
+    /\bHere at\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})[,.\s]/i,
+    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+hiring\b/i,
+    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+seeking\b/i,
+    /\bAbout\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
+  ];
+  for (const pattern of companyPatterns) {
+    const match = jdText.match(pattern);
+    if (match?.[1]) {
+      company = match[1].trim();
+      break;
+    }
   }
 
-  let company = '';
-  const seekingMatch = jd.match(/([A-Z][A-Za-z0-9&.,\- ]{1,60})\s+is\s+seeking/i);
-  if (seekingMatch?.[1]) company = seekingMatch[1].trim();
-
   if (!company) {
-    const atMatch = jd.match(/\bat\s+([A-Z][A-Za-z0-9&.,\- ]{1,60})/i);
-    if (atMatch?.[1]) company = atMatch[1].trim();
+    const titleCaseLine = lines.find((line) =>
+      /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) &&
+      !/location|workplace|description|about|responsibilities|skills|qualifications/i.test(line)
+    );
+    if (titleCaseLine) company = titleCaseLine;
+  }
+
+  let role = '';
+  const rolePatterns = [
+    /\b(?:hiring|seeking)\s+an?\s+([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=\s+to\b|[.,\n]|$)/i,
+    /\bRole\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+    /\bPosition\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+  ];
+  for (const pattern of rolePatterns) {
+    const match = jdText.match(pattern);
+    if (match?.[1]) {
+      role = match[1].trim();
+      break;
+    }
+  }
+
+  if (!role) {
+    const roleLine = lines.find((line) =>
+      /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(
+        line
+      ) &&
+      !/location|workplace|about the role|responsibilities|required skills|qualifications|preferred/i.test(
+        line
+      )
+    );
+    if (roleLine) role = roleLine;
   }
 
   return { role, company };
@@ -69,7 +106,7 @@ function buildDownloadBaseName(tex, jd) {
   const { role, company } = extractRoleCompanyFromJD(jd);
   const roleToken = sanitizeToken(role || 'target_role', 40);
   const companyToken = sanitizeToken(company || 'target_company', 40);
-  const base = [candidate, roleToken, companyToken].filter(Boolean).join('__') || 'optimized_resume';
+  const base = [candidate, companyToken, roleToken].filter(Boolean).join('_') || 'optimized_resume';
   return base.slice(0, 120);
 }
 
