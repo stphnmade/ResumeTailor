@@ -130,6 +130,18 @@ function buildSingleFileTar(fileName: string, content: Buffer): Buffer {
   return Buffer.concat([header, content, contentPadding, eofPadding]);
 }
 
+function normalizeTexForRemoteCompile(tex: string): string {
+  return tex
+    .replace(/\u2013/g, "--") // en dash
+    .replace(/\u2014/g, "---") // em dash
+    .replace(/\u2212/g, "-") // minus sign
+    .replace(/[\u2018\u2019]/g, "'") // smart single quotes
+    .replace(/[\u201C\u201D]/g, '"') // smart double quotes
+    .replace(/\u2026/g, "...") // ellipsis
+    .replace(/\u00A0/g, " ") // nbsp
+    .replace(/\u00AD/g, ""); // soft hyphen
+}
+
 async function fetchRemotePdf(url: string, init: RequestInit, label: string): Promise<Buffer> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REMOTE_COMPILE_TIMEOUT_MS);
@@ -196,8 +208,9 @@ async function compileWithRemoteQueryEndpoint(baseUrl: string, tex: string): Pro
 
 async function compileWithRemoteLatexOnline(workDir: string, texFileName: string): Promise<Buffer> {
   const texPath = path.join(workDir, texFileName);
-  const texBuffer = await readFile(texPath);
-  const tex = texBuffer.toString("utf8");
+  const rawTex = (await readFile(texPath)).toString("utf8");
+  const tex = normalizeTexForRemoteCompile(rawTex);
+  const texBuffer = Buffer.from(tex, "utf8");
   const errors: string[] = [];
 
   for (const baseUrl of REMOTE_FALLBACK_HOSTS) {
