@@ -117,6 +117,15 @@ input[type="file"] {
   background: #fafbfc;
 }
 
+input[type="text"] {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
 label {
   font-size: 0.88rem;
   color: var(--muted);
@@ -216,6 +225,40 @@ textarea {
   color: #7a4f0a;
 }
 
+.filename-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.filename-field {
+  margin: 0;
+}
+
+.filename-field input[readonly] {
+  background: #f7f9fc;
+  color: var(--muted);
+}
+
+.filename-autofill {
+  white-space: nowrap;
+  align-self: end;
+}
+
+.filename-preview {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.filename-preview code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  background: #f1f4f8;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 .logs-card summary {
   cursor: pointer;
   font-weight: 600;
@@ -265,6 +308,10 @@ pre {
 }
 
 @media (max-width: 1050px) {
+  .filename-grid {
+    grid-template-columns: 1fr;
+  }
+
   .drawer-grid,
   .workspace-grid {
     grid-template-columns: 1fr;

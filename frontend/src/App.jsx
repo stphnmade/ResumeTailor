@@ -101,11 +101,10 @@ function extractRoleCompanyFromJD(jd) {
   return { role, company };
 }
 
-function buildDownloadBaseName(tex, jd) {
-  const candidate = sanitizeToken(extractCandidateNameFromTex(tex), 48);
-  const { role, company } = extractRoleCompanyFromJD(jd);
-  const roleToken = sanitizeToken(role || 'target_role', 40);
-  const companyToken = sanitizeToken(company || 'target_company', 40);
+function buildDownloadBaseNameFromParts(candidateName, companyName, roleName) {
+  const candidate = sanitizeToken(candidateName || 'candidate', 48);
+  const roleToken = sanitizeToken(roleName || 'target_role', 40);
+  const companyToken = sanitizeToken(companyName || 'target_company', 40);
   const base = [candidate, companyToken, roleToken].filter(Boolean).join('_') || 'optimized_resume';
   return base.slice(0, 120);
 }
@@ -163,6 +162,8 @@ export default function App() {
   const [error, setError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [downloadCompany, setDownloadCompany] = useState('');
+  const [downloadRole, setDownloadRole] = useState('');
 
   const pdfPreviewUrlRef = useRef('');
 
@@ -171,12 +172,31 @@ export default function App() {
     [versions, selectedVersionId]
   );
 
-  const inferredBaseName = useMemo(() => {
+  const autoCandidateName = useMemo(() => {
     const sourceTex = editorTex || resumeDraft;
-    return sourceTex.trim() ? buildDownloadBaseName(sourceTex, jobDraft) : 'optimized_resume';
-  }, [editorTex, resumeDraft, jobDraft]);
+    return extractCandidateNameFromTex(sourceTex || '');
+  }, [editorTex, resumeDraft]);
 
-  const activeBaseName = selectedVersion?.baseName || inferredBaseName;
+  const detectedFromJD = useMemo(() => extractRoleCompanyFromJD(jobDraft), [jobDraft]);
+
+  useEffect(() => {
+    if (!downloadCompany && detectedFromJD.company) {
+      setDownloadCompany(detectedFromJD.company);
+    }
+    if (!downloadRole && detectedFromJD.role) {
+      setDownloadRole(detectedFromJD.role);
+    }
+  }, [detectedFromJD.company, detectedFromJD.role, downloadCompany, downloadRole]);
+
+  const activeBaseName = useMemo(
+    () =>
+      buildDownloadBaseNameFromParts(
+        autoCandidateName,
+        downloadCompany || detectedFromJD.company,
+        downloadRole || detectedFromJD.role
+      ),
+    [autoCandidateName, downloadCompany, downloadRole, detectedFromJD.company, detectedFromJD.role]
+  );
 
   const canGenerate = !isGenerating && !!resumeDraft.trim() && !!jobDraft.trim();
   const canCompile = !isCompiling && !!editorTex.trim();
@@ -279,7 +299,7 @@ export default function App() {
     return '';
   }
 
-  function createVersion(tex, metadataValue, baseName) {
+  function createVersion(tex, metadataValue) {
     const nextNumber = versions.length + 1;
     const version = {
       id: `v${nextNumber}-${Date.now()}`,
@@ -287,7 +307,6 @@ export default function App() {
       timestamp: new Date().toLocaleString(),
       tex,
       metadata: metadataValue || null,
-      baseName,
     };
 
     setVersions((prev) => [...prev, version]);
@@ -367,8 +386,7 @@ export default function App() {
     try {
       const data = await generateTex(resumeDraft, jobDraft);
       const nextTex = data.optimized_tex || '';
-      const baseName = buildDownloadBaseName(nextTex || resumeDraft, jobDraft);
-      const version = createVersion(nextTex, data.metadata || null, baseName);
+      const version = createVersion(nextTex, data.metadata || null);
 
       setAppliedAt(new Date().toLocaleString());
       setDrawerOpen(false);
@@ -386,7 +404,7 @@ export default function App() {
         warning: data.metadata?.warning || '',
       });
 
-      await compileCurrent({ tex: nextTex, download: false, label: version.label, baseName });
+      await compileCurrent({ tex: nextTex, download: false, label: version.label });
     } catch (err) {
       const message = String(err?.message || err);
       setError(message);
@@ -433,6 +451,11 @@ export default function App() {
     }
   }
 
+  function onAutofillDownloadName() {
+    setDownloadCompany(detectedFromJD.company || '');
+    setDownloadRole(detectedFromJD.role || '');
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -467,6 +490,37 @@ export default function App() {
           <span>Selected: <strong>{selectedVersion?.label || 'working copy'}</strong>{editorDirty ? ' (edited)' : ''}</span>
           <span>Tokens: <strong>{summarizeTokens(metadata?.openai_tokens?.total)}</strong></span>
           <span>Applied inputs: <strong>{appliedAt || 'not yet'}</strong></span>
+        </div>
+
+        <div className="filename-grid">
+          <label className="filename-field">
+            Candidate (auto)
+            <input type="text" value={autoCandidateName} readOnly />
+          </label>
+          <label className="filename-field">
+            Company
+            <input
+              type="text"
+              value={downloadCompany}
+              onChange={(e) => setDownloadCompany(e.target.value)}
+              placeholder={detectedFromJD.company || 'target company'}
+            />
+          </label>
+          <label className="filename-field">
+            Role
+            <input
+              type="text"
+              value={downloadRole}
+              onChange={(e) => setDownloadRole(e.target.value)}
+              placeholder={detectedFromJD.role || 'target role'}
+            />
+          </label>
+          <button type="button" className="secondary filename-autofill" onClick={onAutofillDownloadName}>
+            Auto-fill from JD
+          </button>
+          <div className="filename-preview">
+            Download name: <code>{`${activeBaseName}.pdf`}</code>
+          </div>
         </div>
       </section>
 
