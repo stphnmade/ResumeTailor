@@ -29,6 +29,44 @@ function cleanJobText(value) {
     .trim();
 }
 
+function cleanDetectionLine(value) {
+  return String(value || '')
+    .replace(/^[\s\-*•|:]+/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[|:]+$/g, '')
+    .trim();
+}
+
+function isLikelyNoiseLine(line) {
+  return !line || /^(job description|about (the )?role|responsibilities|requirements|qualifications|preferred|benefits|location|salary|hours|schedule)$/i.test(line);
+}
+
+function looksLikeRoleLine(line) {
+  return /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant|designer|architect|scientist|coordinator|technician|associate|lead|director|recruiter|writer|editor|intern)\b/i.test(
+    line
+  );
+}
+
+function looksLikeCompanyLine(line) {
+  return /\b(inc|llc|ltd|corp|company|technologies|technology|systems|solutions|labs|group|partners|university|health|bank|services|studio|media)\b/i.test(
+    line
+  );
+}
+
+function cleanDetectedEntity(value, kind) {
+  const cleaned = cleanDetectionLine(value)
+    .replace(/\b(remote|hybrid|onsite)\b/gi, '')
+    .replace(/\s+\|\s+.*/g, '')
+    .replace(/\s+-\s+(remote|hybrid|onsite).*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  if (!cleaned || isLikelyNoiseLine(cleaned)) return '';
+  if (kind === 'role' && cleaned.length > 90) return '';
+  if (kind === 'company' && cleaned.length > 70) return '';
+  return cleaned;
+}
+
 function extractCandidateNameFromTex(tex) {
   const headerMatch = tex.match(/\{\\Huge\s+\\scshape\s+([^}]*)\}/);
   if (headerMatch?.[1]) {
@@ -46,11 +84,44 @@ function extractRoleCompanyFromJD(jd) {
   const jdText = cleanJobText(jd);
   const lines = String(jd || '')
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .map((line) => cleanDetectionLine(line))
+    .filter((line) => line && !isLikelyNoiseLine(line));
+
+  const topLines = lines.slice(0, 12);
+
+  for (let index = 0; index < Math.min(topLines.length, 6); index += 1) {
+    const line = topLines[index];
+    const nextLine = topLines[index + 1] || '';
+
+    if (looksLikeRoleLine(line) && nextLine && !looksLikeRoleLine(nextLine)) {
+      const role = cleanDetectedEntity(line, 'role');
+      const company = cleanDetectedEntity(nextLine, 'company');
+      if (role || company) {
+        return { role, company };
+      }
+    }
+
+    if (looksLikeCompanyLine(line) && nextLine && looksLikeRoleLine(nextLine)) {
+      const company = cleanDetectedEntity(line, 'company');
+      const role = cleanDetectedEntity(nextLine, 'role');
+      if (role || company) {
+        return { role, company };
+      }
+    }
+
+    const splitMatch = line.match(/^(.+?)\s+(?:@|at|-)\s+(.+)$/i);
+    if (splitMatch?.[1] && splitMatch?.[2]) {
+      const left = cleanDetectedEntity(splitMatch[1], 'role');
+      const right = cleanDetectedEntity(splitMatch[2], 'company');
+      if (looksLikeRoleLine(left) || looksLikeCompanyLine(right)) {
+        return { role: left, company: right };
+      }
+    }
+  }
 
   let company = '';
   const companyPatterns = [
+    /\b(?:company|organization|employer)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
     /\bHere at\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})[,.\s]/i,
     /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+hiring\b/i,
     /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+seeking\b/i,
@@ -59,21 +130,22 @@ function extractRoleCompanyFromJD(jd) {
   for (const pattern of companyPatterns) {
     const match = jdText.match(pattern);
     if (match?.[1]) {
-      company = match[1].trim();
+      company = cleanDetectedEntity(match[1], 'company');
       break;
     }
   }
 
   if (!company) {
-    const titleCaseLine = lines.find((line) =>
+    const titleCaseLine = topLines.find((line) =>
       /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) &&
-      !/location|workplace|description|about|responsibilities|skills|qualifications/i.test(line)
+      !looksLikeRoleLine(line)
     );
-    if (titleCaseLine) company = titleCaseLine;
+    if (titleCaseLine) company = cleanDetectedEntity(titleCaseLine, 'company');
   }
 
   let role = '';
   const rolePatterns = [
+    /\b(?:job title|title|role|position)\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
     /\b(?:hiring|seeking)\s+an?\s+([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=\s+to\b|[.,\n]|$)/i,
     /\bRole\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
     /\bPosition\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
@@ -81,21 +153,19 @@ function extractRoleCompanyFromJD(jd) {
   for (const pattern of rolePatterns) {
     const match = jdText.match(pattern);
     if (match?.[1]) {
-      role = match[1].trim();
+      role = cleanDetectedEntity(match[1], 'role');
       break;
     }
   }
 
   if (!role) {
-    const roleLine = lines.find((line) =>
+    const roleLine = topLines.find((line) =>
       /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(
         line
       ) &&
-      !/location|workplace|about the role|responsibilities|required skills|qualifications|preferred/i.test(
-        line
-      )
+      !looksLikeCompanyLine(line)
     );
-    if (roleLine) role = roleLine;
+    if (roleLine) role = cleanDetectedEntity(roleLine, 'role');
   }
 
   return { role, company };
@@ -164,6 +234,8 @@ export default function App() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [downloadCompany, setDownloadCompany] = useState('');
   const [downloadRole, setDownloadRole] = useState('');
+  const [downloadCompanyEdited, setDownloadCompanyEdited] = useState(false);
+  const [downloadRoleEdited, setDownloadRoleEdited] = useState(false);
 
   const pdfPreviewUrlRef = useRef('');
 
@@ -178,24 +250,17 @@ export default function App() {
   }, [editorTex, resumeDraft]);
 
   const detectedFromJD = useMemo(() => extractRoleCompanyFromJD(jobDraft), [jobDraft]);
-
-  useEffect(() => {
-    if (!downloadCompany && detectedFromJD.company) {
-      setDownloadCompany(detectedFromJD.company);
-    }
-    if (!downloadRole && detectedFromJD.role) {
-      setDownloadRole(detectedFromJD.role);
-    }
-  }, [detectedFromJD.company, detectedFromJD.role, downloadCompany, downloadRole]);
+  const resolvedDownloadCompany = downloadCompanyEdited ? downloadCompany : downloadCompany || detectedFromJD.company;
+  const resolvedDownloadRole = downloadRoleEdited ? downloadRole : downloadRole || detectedFromJD.role;
 
   const activeBaseName = useMemo(
     () =>
       buildDownloadBaseNameFromParts(
         autoCandidateName,
-        downloadCompany || detectedFromJD.company,
-        downloadRole || detectedFromJD.role
+        resolvedDownloadCompany,
+        resolvedDownloadRole
       ),
-    [autoCandidateName, downloadCompany, downloadRole, detectedFromJD.company, detectedFromJD.role]
+    [autoCandidateName, resolvedDownloadCompany, resolvedDownloadRole]
   );
 
   const canGenerate = !isGenerating && !!resumeDraft.trim() && !!jobDraft.trim();
@@ -454,13 +519,15 @@ export default function App() {
   function onAutofillDownloadName() {
     setDownloadCompany(detectedFromJD.company || '');
     setDownloadRole(detectedFromJD.role || '');
+    setDownloadCompanyEdited(true);
+    setDownloadRoleEdited(true);
   }
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>ResumeTailor Pipeline</h1>
-        <p>input -> generate -> review -> tweak -> regenerate/compile -> download</p>
+        <p>input -&gt; generate -&gt; review -&gt; tweak -&gt; regenerate/compile -&gt; download</p>
       </header>
 
       <section className="toolbar card">
@@ -502,7 +569,10 @@ export default function App() {
             <input
               type="text"
               value={downloadCompany}
-              onChange={(e) => setDownloadCompany(e.target.value)}
+              onChange={(e) => {
+                setDownloadCompanyEdited(true);
+                setDownloadCompany(e.target.value);
+              }}
               placeholder={detectedFromJD.company || 'target company'}
             />
           </label>
@@ -511,7 +581,10 @@ export default function App() {
             <input
               type="text"
               value={downloadRole}
-              onChange={(e) => setDownloadRole(e.target.value)}
+              onChange={(e) => {
+                setDownloadRoleEdited(true);
+                setDownloadRole(e.target.value);
+              }}
               placeholder={detectedFromJD.role || 'target role'}
             />
           </label>

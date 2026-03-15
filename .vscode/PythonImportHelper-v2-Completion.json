@@ -1,0 +1,700 @@
+[
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "replace",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "JDAnalysis",
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "isExtraImport": true,
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "JDAnalysis",
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "isExtraImport": true,
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "JDAnalysis",
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "isExtraImport": true,
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "JDAnalysis",
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "isExtraImport": true,
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "analyze_job_description_local",
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "isExtraImport": true,
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "Bullet",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "ParsedResume",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "latex_to_plain_text",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "render_bullet_with_new_content",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "parse_resume_latex",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "rebuild_resume",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "parse_resume_latex",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "rebuild_resume",
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "isExtraImport": true,
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClient",
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "isExtraImport": true,
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClientError",
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "isExtraImport": true,
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClient",
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "isExtraImport": true,
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClientError",
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "isExtraImport": true,
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "Iterable",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "unittest",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "unittest",
+        "description": "unittest",
+        "detail": "unittest",
+        "documentation": {}
+    },
+    {
+        "label": "align_resume",
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "isExtraImport": true,
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "get_aggression_profile",
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "isExtraImport": true,
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "align_resume",
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "isExtraImport": true,
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "get_aggression_profile",
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "isExtraImport": true,
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "rewrite_selected_bullets",
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "isExtraImport": true,
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "argparse",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "argparse",
+        "description": "argparse",
+        "detail": "argparse",
+        "documentation": {}
+    },
+    {
+        "label": "shutil",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "shutil",
+        "description": "shutil",
+        "detail": "shutil",
+        "documentation": {}
+    },
+    {
+        "label": "subprocess",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "subprocess",
+        "description": "subprocess",
+        "detail": "subprocess",
+        "documentation": {}
+    },
+    {
+        "label": "sys",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sys",
+        "description": "sys",
+        "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "get_openai_api_key",
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "isExtraImport": true,
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "get_openai_model",
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "isExtraImport": true,
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "load_runtime_env",
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "isExtraImport": true,
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "load_env_file",
+        "kind": 2,
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "peekOfCode": "def load_env_file(path: Path) -> None:\n    if not path.exists():\n        return\n    for line in path.read_text(encoding=\"utf-8\").splitlines():\n        parsed = _parse_env_line(line)\n        if not parsed:\n            continue\n        key, value = parsed\n        os.environ.setdefault(key, value)\ndef load_runtime_env(repo_root: Path) -> None:",
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "load_runtime_env",
+        "kind": 2,
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "peekOfCode": "def load_runtime_env(repo_root: Path) -> None:\n    # .env provides defaults; .env.local overrides for local development.\n    load_env_file(repo_root / \".env\")\n    if (repo_root / \".env.local\").exists():\n        for line in (repo_root / \".env.local\").read_text(encoding=\"utf-8\").splitlines():\n            parsed = _parse_env_line(line)\n            if parsed:\n                key, value = parsed\n                os.environ[key] = value\ndef get_openai_api_key() -> str | None:",
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "get_openai_api_key",
+        "kind": 2,
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "peekOfCode": "def get_openai_api_key() -> str | None:\n    return os.getenv(\"OPENAI_API_KEY\")\ndef get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-4.1-mini\")",
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "get_openai_model",
+        "kind": 2,
+        "importPath": "rae.config",
+        "description": "rae.config",
+        "peekOfCode": "def get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-4.1-mini\")",
+        "detail": "rae.config",
+        "documentation": {}
+    },
+    {
+        "label": "AggressionProfile",
+        "kind": 6,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "class AggressionProfile:\n    name: str\n    max_total_bullets: int\n    exp_primary_limit: int\n    exp_secondary_limit: int\n    project_limit: int\n    keyword_weight: float\n    hard_weight: float\n    soft_weight: float\n    tool_weight: float",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "AlignmentResult",
+        "kind": 6,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "class AlignmentResult:\n    bullet_scores: dict[int, float]\n    selected_by_block: dict[int, list[Bullet]]\ndef _tokenize(text: str) -> set[str]:\n    raw_tokens = [m.group(0).lower().strip(\".,;:()[]\") for m in WORD_RE.finditer(text)]\n    normalized: set[str] = set()\n    for token in raw_tokens:\n        if not token:\n            continue\n        normalized.add(token)",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "get_aggression_profile",
+        "kind": 2,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "def get_aggression_profile(name: str) -> AggressionProfile:\n    return PROFILES.get(name, PROFILES[\"balanced\"])\n@dataclass\nclass AlignmentResult:\n    bullet_scores: dict[int, float]\n    selected_by_block: dict[int, list[Bullet]]\ndef _tokenize(text: str) -> set[str]:\n    raw_tokens = [m.group(0).lower().strip(\".,;:()[]\") for m in WORD_RE.finditer(text)]\n    normalized: set[str] = set()\n    for token in raw_tokens:",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "align_resume",
+        "kind": 2,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "def align_resume(\n    parsed: ParsedResume,\n    jd: JDAnalysis,\n    profile: AggressionProfile,\n    max_total_bullets: int | None = None,\n) -> AlignmentResult:\n    scores = {bullet.id: _score_bullet(bullet, jd, profile) for bullet in parsed.bullets}\n    selected_by_block: dict[int, list[Bullet]] = {}\n    exp_idx = 0\n    for block in parsed.blocks:",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "rewrite_selected_bullets",
+        "kind": 2,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "def rewrite_selected_bullets(\n    selected_by_block: dict[int, list[Bullet]],\n    openai_client: OpenAIClient,\n    jd: JDAnalysis,\n    job_description: str,\n    aggression: str,\n) -> dict[int, list[Bullet]]:\n    rewritten: dict[int, list[Bullet]] = {}\n    for block_id, bullets in selected_by_block.items():\n        if not bullets:",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "WORD_RE",
+        "kind": 5,
+        "importPath": "rae.engine",
+        "description": "rae.engine",
+        "peekOfCode": "WORD_RE = re.compile(r\"[A-Za-z0-9.+#/-]+\")\n@dataclass(frozen=True)\nclass AggressionProfile:\n    name: str\n    max_total_bullets: int\n    exp_primary_limit: int\n    exp_secondary_limit: int\n    project_limit: int\n    keyword_weight: float\n    hard_weight: float",
+        "detail": "rae.engine",
+        "documentation": {}
+    },
+    {
+        "label": "JDAnalysis",
+        "kind": 6,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "class JDAnalysis:\n    keywords: list[str]\n    hard_skills: list[str]\n    soft_skills: list[str]\n    tools: list[str]\n    responsibilities: list[str]\n    seniority: str\nWORD_RE = re.compile(r\"[A-Za-z0-9.+#/-]+\")\ndef _tokenize(text: str) -> list[str]:\n    tokens: list[str] = []",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "analyze_job_description_local",
+        "kind": 2,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "def analyze_job_description_local(job_description: str) -> JDAnalysis:\n    lines = [ln.strip(\" -\\t\") for ln in job_description.splitlines() if ln.strip()]\n    tokens = _tokenize(job_description)\n    keywords = _top_terms(tokens, limit=40)\n    tools = sorted({term for term in keywords if term in TOOL_HINTS})\n    soft_skills = sorted({term for term in keywords if term in SOFT_SKILL_HINTS})\n    hard_skills = [term for term in keywords if term not in soft_skills][:12]\n    responsibilities = [ln for ln in lines if len(ln.split()) >= 5][:10]\n    seniority = \"unspecified\"\n    for token in tokens:",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "STOPWORDS",
+        "kind": 5,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "STOPWORDS = {\n    \"a\",\n    \"an\",\n    \"and\",\n    \"are\",\n    \"as\",\n    \"at\",\n    \"be\",\n    \"by\",\n    \"for\",",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "TOOL_HINTS",
+        "kind": 5,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "TOOL_HINTS = {\n    \"aws\",\n    \"azure\",\n    \"gcp\",\n    \"docker\",\n    \"kubernetes\",\n    \"terraform\",\n    \"linux\",\n    \"postgresql\",\n    \"mysql\",",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "SOFT_SKILL_HINTS",
+        "kind": 5,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "SOFT_SKILL_HINTS = {\n    \"communication\",\n    \"collaboration\",\n    \"ownership\",\n    \"leadership\",\n    \"mentorship\",\n    \"documentation\",\n    \"stakeholder\",\n    \"escalation\",\n    \"support\",",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "SENIORITY_HINTS",
+        "kind": 5,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "SENIORITY_HINTS = {\n    \"intern\": \"intern\",\n    \"junior\": \"junior\",\n    \"mid\": \"mid\",\n    \"senior\": \"senior\",\n    \"staff\": \"staff\",\n    \"principal\": \"principal\",\n    \"lead\": \"lead\",\n    \"manager\": \"manager\",\n}",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "WORD_RE",
+        "kind": 5,
+        "importPath": "rae.jd",
+        "description": "rae.jd",
+        "peekOfCode": "WORD_RE = re.compile(r\"[A-Za-z0-9.+#/-]+\")\ndef _tokenize(text: str) -> list[str]:\n    tokens: list[str] = []\n    for match in WORD_RE.finditer(text):\n        raw = match.group(0).lower().strip(\".,;:()[]\")\n        if not raw:\n            continue\n        tokens.append(raw)\n        for part in re.split(r\"[/\\\\-]\", raw):\n            if part and part != raw:",
+        "detail": "rae.jd",
+        "documentation": {}
+    },
+    {
+        "label": "Bullet",
+        "kind": 6,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "class Bullet:\n    id: int\n    block_id: int\n    section: str\n    kind: str\n    start_rel: int\n    end_rel: int\n    raw: str\n    content: str\n@dataclass",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "BulletBlock",
+        "kind": 6,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "class BulletBlock:\n    id: int\n    section: str\n    start_line: int\n    end_line: int\n    interior_lines: list[str]\n    bullets: list[Bullet]\n@dataclass\nclass ParsedResume:\n    lines: list[str]",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "ParsedResume",
+        "kind": 6,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "class ParsedResume:\n    lines: list[str]\n    blocks: list[BulletBlock]\n    bullets: list[Bullet]\ndef _section_spans(lines: list[str]) -> list[tuple[int, str]]:\n    spans: list[tuple[int, str]] = []\n    for i, line in enumerate(lines):\n        m = SECTION_RE.match(line)\n        if m:\n            spans.append((i, m.group(1).strip()))",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "parse_resume_latex",
+        "kind": 2,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "def parse_resume_latex(text: str) -> ParsedResume:\n    lines = text.splitlines(keepends=True)\n    spans = _section_spans(lines)\n    blocks: list[BulletBlock] = []\n    bullets: list[Bullet] = []\n    depth = 0\n    block_start = -1\n    next_block_id = 0\n    next_bullet_id = 0\n    for i, line in enumerate(lines):",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "latex_to_plain_text",
+        "kind": 2,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "def latex_to_plain_text(text: str) -> str:\n    cleaned = LATEX_CMD_RE.sub(\" \", text)\n    cleaned = cleaned.replace(\"{\", \" \").replace(\"}\", \" \")\n    cleaned = cleaned.replace(\"~\", \" \")\n    cleaned = re.sub(r\"\\s+\", \" \", cleaned)\n    return cleaned.strip()\ndef escape_latex_text(text: str) -> str:\n    replacements = {\n        \"\\\\\": r\"\\\\textbackslash{}\",\n        \"&\": r\"\\\\&\",",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "escape_latex_text",
+        "kind": 2,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "def escape_latex_text(text: str) -> str:\n    replacements = {\n        \"\\\\\": r\"\\\\textbackslash{}\",\n        \"&\": r\"\\\\&\",\n        \"%\": r\"\\\\%\",\n        \"$\": r\"\\\\$\",\n        \"#\": r\"\\\\#\",\n        \"_\": r\"\\\\_\",\n        \"{\": r\"\\\\{\",\n        \"}\": r\"\\\\}\",",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "render_bullet_with_new_content",
+        "kind": 2,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "def render_bullet_with_new_content(bullet: Bullet, new_content_plain: str) -> str:\n    escaped = escape_latex_text(new_content_plain.strip())\n    if bullet.kind == \"resumeItem\":\n        marker = \"\\\\resumeItem\"\n        idx = bullet.raw.find(marker)\n        if idx == -1:\n            return bullet.raw\n        open_idx = bullet.raw.find(\"{\", idx)\n        if open_idx == -1:\n            return bullet.raw",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "rebuild_resume",
+        "kind": 2,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "def rebuild_resume(parsed: ParsedResume, block_to_bullets: dict[int, list[Bullet]]) -> str:\n    lines = parsed.lines[:]\n    for block in parsed.blocks:\n        if block.id not in block_to_bullets:\n            continue\n        ordered_bullets = block_to_bullets[block.id]\n        if not ordered_bullets:\n            continue\n        interior = block.interior_lines\n        first = min(b.start_rel for b in block.bullets) if block.bullets else 0",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "SECTION_RE",
+        "kind": 5,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "SECTION_RE = re.compile(r\"^\\s*\\\\section\\{([^}]+)\\}\")\nLIST_START_RE = re.compile(r\"\\\\(resumeItemListStart|begin\\{itemize\\})\")\nLIST_END_RE = re.compile(r\"\\\\(resumeItemListEnd|end\\{itemize\\})\")\n@dataclass\nclass Bullet:\n    id: int\n    block_id: int\n    section: str\n    kind: str\n    start_rel: int",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "LIST_START_RE",
+        "kind": 5,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "LIST_START_RE = re.compile(r\"\\\\(resumeItemListStart|begin\\{itemize\\})\")\nLIST_END_RE = re.compile(r\"\\\\(resumeItemListEnd|end\\{itemize\\})\")\n@dataclass\nclass Bullet:\n    id: int\n    block_id: int\n    section: str\n    kind: str\n    start_rel: int\n    end_rel: int",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "LIST_END_RE",
+        "kind": 5,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "LIST_END_RE = re.compile(r\"\\\\(resumeItemListEnd|end\\{itemize\\})\")\n@dataclass\nclass Bullet:\n    id: int\n    block_id: int\n    section: str\n    kind: str\n    start_rel: int\n    end_rel: int\n    raw: str",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "LATEX_CMD_RE",
+        "kind": 5,
+        "importPath": "rae.latex",
+        "description": "rae.latex",
+        "peekOfCode": "LATEX_CMD_RE = re.compile(r\"\\\\[A-Za-z@]+\")\ndef latex_to_plain_text(text: str) -> str:\n    cleaned = LATEX_CMD_RE.sub(\" \", text)\n    cleaned = cleaned.replace(\"{\", \" \").replace(\"}\", \" \")\n    cleaned = cleaned.replace(\"~\", \" \")\n    cleaned = re.sub(r\"\\s+\", \" \", cleaned)\n    return cleaned.strip()\ndef escape_latex_text(text: str) -> str:\n    replacements = {\n        \"\\\\\": r\"\\\\textbackslash{}\",",
+        "detail": "rae.latex",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClientError",
+        "kind": 6,
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "peekOfCode": "class OpenAIClientError(RuntimeError):\n    pass\n@dataclass\nclass OpenAIClient:\n    api_key: str\n    model: str\n    def __post_init__(self) -> None:\n        try:\n            from openai import OpenAI\n        except ImportError as exc:",
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIClient",
+        "kind": 6,
+        "importPath": "rae.openai_client",
+        "description": "rae.openai_client",
+        "peekOfCode": "class OpenAIClient:\n    api_key: str\n    model: str\n    def __post_init__(self) -> None:\n        try:\n            from openai import OpenAI\n        except ImportError as exc:\n            raise OpenAIClientError(\n                \"Missing dependency: openai. Install with `pip install -r requirements.txt`.\"\n            ) from exc",
+        "detail": "rae.openai_client",
+        "documentation": {}
+    },
+    {
+        "label": "TestRAE",
+        "kind": 6,
+        "importPath": "tests.test_rae",
+        "description": "tests.test_rae",
+        "peekOfCode": "class TestRAE(unittest.TestCase):\n    def test_parse_resume_detects_bullets(self) -> None:\n        parsed = parse_resume_latex(SAMPLE_TEX)\n        self.assertEqual(len(parsed.blocks), 2)\n        self.assertEqual(len(parsed.bullets), 5)\n    def test_align_prioritizes_relevant_bullets(self) -> None:\n        parsed = parse_resume_latex(SAMPLE_TEX)\n        jd = JDAnalysis(\n            keywords=[\"docker\", \"sla\", \"escalation\", \"support\"],\n            hard_skills=[\"docker\"],",
+        "detail": "tests.test_rae",
+        "documentation": {}
+    },
+    {
+        "label": "SAMPLE_TEX",
+        "kind": 5,
+        "importPath": "tests.test_rae",
+        "description": "tests.test_rae",
+        "peekOfCode": "SAMPLE_TEX = r\"\"\"\n\\section{Experience}\n\\resumeItemListStart\n  \\resumeItem{Resolved customer escalations and maintained SLA compliance for support queue.}\n  \\resumeItem{Wrote internal documentation for common troubleshooting workflows.}\n  \\resumeItem{Built Docker-based local environment for reproducible debugging.}\n\\resumeItemListEnd\n\\section{Projects}\n\\resumeItemListStart\n  \\resumeItem{Developed a React dashboard for viewing support metrics.}",
+        "detail": "tests.test_rae",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "tailor",
+        "description": "tailor",
+        "peekOfCode": "def main() -> int:\n    args = _build_parser().parse_args()\n    repo_root = Path.cwd()\n    load_runtime_env(repo_root)\n    if not args.resume_tex.exists():\n        print(f\"error: resume file not found: {args.resume_tex}\", file=sys.stderr)\n        return 1\n    if not args.job_description.exists():\n        print(f\"error: job description file not found: {args.job_description}\", file=sys.stderr)\n        return 1",
+        "detail": "tailor",
+        "documentation": {}
+    }
+]
