@@ -228,7 +228,6 @@ export default function App() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState('');
   const [pdfPreviewFilename, setPdfPreviewFilename] = useState('optimized_resume.pdf');
   const [isPreviewStale, setIsPreviewStale] = useState(false);
-
   const [coverLetterPdfPreviewUrl, setCoverLetterPdfPreviewUrl] = useState('');
   const [coverLetterPdfPreviewFilename, setCoverLetterPdfPreviewFilename] = useState('optimized_cover_letter.pdf');
   const [isCoverLetterPreviewStale, setIsCoverLetterPreviewStale] = useState(false);
@@ -645,8 +644,6 @@ export default function App() {
         tokens: data.metadata?.openai_tokens?.total || null,
         warning: data.metadata?.warning || '',
       });
-
-      await compileCurrentCoverLetter({ tex: nextTex, download: false, label: version.label });
     } catch (err) {
       const message = String(err?.message || err);
       setError(message);
@@ -704,7 +701,7 @@ export default function App() {
     if (coverLetterPdfPreviewUrl && !isCoverLetterPreviewStale) {
       const a = document.createElement('a');
       a.href = coverLetterPdfPreviewUrl;
-      a.download = `${activeCoverLetterBaseName}.pdf`;
+      a.download = coverLetterPdfPreviewFilename || `${activeCoverLetterBaseName}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -819,7 +816,7 @@ export default function App() {
             {isGeneratingCoverLetter ? 'Generating...' : 'Generate Cover Letter'}
           </button>
           <button type="button" onClick={() => void compileCurrentCoverLetter()} disabled={!canCompileCoverLetter}>
-            {isCompilingCoverLetter ? 'Compiling...' : 'Compile Current'}
+            {isCompilingCoverLetter ? 'Compiling...' : 'Try PDF Preview'}
           </button>
           <button
             type="button"
@@ -908,7 +905,7 @@ export default function App() {
             Download name: <code>{`${activeCoverLetterBaseName}.pdf`}</code>
           </div>
           <div className="hint">
-            Plus uses the current resume working copy when available. Otherwise it uses the shared resume source and supplemental notes.
+            Plus stays `.tex`-first, but you can try a PDF preview when compilation is available.
           </div>
         </div>
       </>
@@ -1073,14 +1070,33 @@ export default function App() {
           </section>
 
           <section className="card panel-card">
-            <h2>PDF Preview</h2>
+            <h2>{coverLetterPdfPreviewUrl ? 'PDF Preview' : 'Cover Letter Output'}</h2>
             {coverLetterPdfPreviewUrl ? (
               <>
-                {isCoverLetterPreviewStale ? <div className="hint stale">Preview is stale. Recompile current editor text.</div> : null}
+                {isCoverLetterPreviewStale ? <div className="hint stale">Preview is stale. Re-run PDF preview for the current editor text.</div> : null}
                 <iframe title="Cover Letter PDF Preview" className="pdf-preview" src={coverLetterPdfPreviewUrl} />
               </>
             ) : (
-              <div className="empty-preview">No compiled PDF yet. Generate or compile the cover letter to render preview.</div>
+              <div className="output-summary">
+                <p>Generate a tailored cover letter, review the LaTeX, and use `Try PDF Preview` when compilation is available.</p>
+                <p>
+                  Tone: <strong>{coverLetterMetadata?.tone || coverLetterTone}</strong>
+                </p>
+                <p>
+                  Length: <strong>{coverLetterMetadata?.length || coverLetterLength}</strong>
+                </p>
+                <p>
+                  Skills highlighted: <strong>{(coverLetterMetadata?.skills_highlighted || []).join(', ') || 'none yet'}</strong>
+                </p>
+                <p>
+                  Evidence used: <strong>{(coverLetterMetadata?.evidence_used || []).join(', ') || 'none yet'}</strong>
+                </p>
+                {coverLetterMetadata?.warning ? (
+                  <div className="hint stale">Warning: {coverLetterMetadata.warning}</div>
+                ) : (
+                  <div className="hint">No PDF preview yet. Generate the letter first, then try the preview button.</div>
+                )}
+              </div>
             )}
           </section>
         </section>

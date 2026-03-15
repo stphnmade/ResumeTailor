@@ -251,6 +251,20 @@ textarea {
   padding: 12px;
 }
 
+.output-summary {
+  min-height: calc(62vh - 42px);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.output-summary p {
+  margin: 0;
+}
+
 .hint {
   color: var(--muted);
   font-size: 0.86rem;
