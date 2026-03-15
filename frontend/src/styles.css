@@ -21,6 +21,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -43,6 +44,11 @@ textarea {
   color: var(--muted);
   font-size: 0.92rem;
   text-transform: lowercase;
+}
+
+.tab-row {
+  display: flex;
+  gap: 8px;
 }
 
 .card {
@@ -87,6 +93,18 @@ button.secondary {
   color: var(--accent);
 }
 
+.tab-button {
+  background: #fff;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.tab-button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -126,6 +144,15 @@ input[type="text"] {
   background: #fff;
 }
 
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
 label {
   font-size: 0.88rem;
   color: var(--muted);
@@ -150,6 +177,14 @@ textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.drawer-grid-wide {
+  grid-template-columns: 1fr 1fr;
+}
+
+.drawer-span-full {
+  grid-column: 1 / -1;
 }
 
 .version-list {
@@ -232,6 +267,13 @@ textarea {
   align-items: end;
 }
 
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+}
+
 .filename-field {
   margin: 0;
 }
@@ -257,6 +299,10 @@ textarea {
   background: #f1f4f8;
   padding: 1px 4px;
   border-radius: 4px;
+}
+
+.settings-grid .hint {
+  grid-column: 1 / -1;
 }
 
 .logs-card summary {
@@ -308,7 +354,9 @@ pre {
 }
 
 @media (max-width: 1050px) {
-  .filename-grid {
+  .filename-grid,
+  .settings-grid,
+  .drawer-grid-wide {
     grid-template-columns: 1fr;
   }
 

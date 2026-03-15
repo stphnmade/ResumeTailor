@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BACKEND_URL, compilePdf, generateTex } from './api';
+import { BACKEND_URL, compilePdf, generateCoverLetter, generateTex } from './api';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
 const CANONICAL_RESUME_PATH = 'source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex';
+
+const TONE_OPTIONS = ['professional', 'confident', 'warm'];
+const LENGTH_OPTIONS = ['concise', 'standard', 'detailed'];
 
 function canonicalResumeUrl() {
   const base = import.meta.env.BASE_URL || '/';
@@ -96,17 +99,13 @@ function extractRoleCompanyFromJD(jd) {
     if (looksLikeRoleLine(line) && nextLine && !looksLikeRoleLine(nextLine)) {
       const role = cleanDetectedEntity(line, 'role');
       const company = cleanDetectedEntity(nextLine, 'company');
-      if (role || company) {
-        return { role, company };
-      }
+      if (role || company) return { role, company };
     }
 
     if (looksLikeCompanyLine(line) && nextLine && looksLikeRoleLine(nextLine)) {
       const company = cleanDetectedEntity(line, 'company');
       const role = cleanDetectedEntity(nextLine, 'role');
-      if (role || company) {
-        return { role, company };
-      }
+      if (role || company) return { role, company };
     }
 
     const splitMatch = line.match(/^(.+?)\s+(?:@|at|-)\s+(.+)$/i);
@@ -136,10 +135,7 @@ function extractRoleCompanyFromJD(jd) {
   }
 
   if (!company) {
-    const titleCaseLine = topLines.find((line) =>
-      /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) &&
-      !looksLikeRoleLine(line)
-    );
+    const titleCaseLine = topLines.find((line) => /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) && !looksLikeRoleLine(line));
     if (titleCaseLine) company = cleanDetectedEntity(titleCaseLine, 'company');
   }
 
@@ -159,11 +155,10 @@ function extractRoleCompanyFromJD(jd) {
   }
 
   if (!role) {
-    const roleLine = topLines.find((line) =>
-      /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(
-        line
-      ) &&
-      !looksLikeCompanyLine(line)
+    const roleLine = topLines.find(
+      (line) =>
+        /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(line) &&
+        !looksLikeCompanyLine(line)
     );
     if (roleLine) role = cleanDetectedEntity(roleLine, 'role');
   }
@@ -209,8 +204,10 @@ function makeLog(kind, summary, details) {
 }
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState('resume');
   const [resumeDraft, setResumeDraft] = useState('');
   const [jobDraft, setJobDraft] = useState('');
+  const [contextNotes, setContextNotes] = useState('');
   const [useCanonical, setUseCanonical] = useState(true);
   const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
 
@@ -218,6 +215,11 @@ export default function App() {
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const [editorTex, setEditorTex] = useState('');
   const [editorDirty, setEditorDirty] = useState(false);
+
+  const [coverLetterVersions, setCoverLetterVersions] = useState([]);
+  const [selectedCoverLetterVersionId, setSelectedCoverLetterVersionId] = useState('');
+  const [coverLetterTex, setCoverLetterTex] = useState('');
+  const [coverLetterDirty, setCoverLetterDirty] = useState(false);
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [logsOpen, setLogsOpen] = useState(false);
@@ -227,44 +229,60 @@ export default function App() {
   const [pdfPreviewFilename, setPdfPreviewFilename] = useState('optimized_resume.pdf');
   const [isPreviewStale, setIsPreviewStale] = useState(false);
 
+  const [coverLetterPdfPreviewUrl, setCoverLetterPdfPreviewUrl] = useState('');
+  const [coverLetterPdfPreviewFilename, setCoverLetterPdfPreviewFilename] = useState('optimized_cover_letter.pdf');
+  const [isCoverLetterPreviewStale, setIsCoverLetterPreviewStale] = useState(false);
+
   const [metadata, setMetadata] = useState(null);
+  const [coverLetterMetadata, setCoverLetterMetadata] = useState(null);
   const [appliedAt, setAppliedAt] = useState('');
+  const [coverLetterAppliedAt, setCoverLetterAppliedAt] = useState('');
   const [error, setError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
+  const [isCompilingCoverLetter, setIsCompilingCoverLetter] = useState(false);
   const [downloadCompany, setDownloadCompany] = useState('');
   const [downloadRole, setDownloadRole] = useState('');
   const [downloadCompanyEdited, setDownloadCompanyEdited] = useState(false);
   const [downloadRoleEdited, setDownloadRoleEdited] = useState(false);
+  const [hiringManager, setHiringManager] = useState('');
+  const [coverLetterTone, setCoverLetterTone] = useState('professional');
+  const [coverLetterLength, setCoverLetterLength] = useState('standard');
 
   const pdfPreviewUrlRef = useRef('');
+  const coverLetterPdfPreviewUrlRef = useRef('');
 
   const selectedVersion = useMemo(
     () => versions.find((item) => item.id === selectedVersionId) || null,
     [versions, selectedVersionId]
   );
+  const selectedCoverLetterVersion = useMemo(
+    () => coverLetterVersions.find((item) => item.id === selectedCoverLetterVersionId) || null,
+    [coverLetterVersions, selectedCoverLetterVersionId]
+  );
 
-  const autoCandidateName = useMemo(() => {
-    const sourceTex = editorTex || resumeDraft;
-    return extractCandidateNameFromTex(sourceTex || '');
+  const currentResumeSourceForLetter = useMemo(() => {
+    if (String(editorTex || '').trim()) return editorTex;
+    return resumeDraft;
   }, [editorTex, resumeDraft]);
 
+  const autoCandidateName = useMemo(() => extractCandidateNameFromTex(currentResumeSourceForLetter || ''), [currentResumeSourceForLetter]);
   const detectedFromJD = useMemo(() => extractRoleCompanyFromJD(jobDraft), [jobDraft]);
   const resolvedDownloadCompany = downloadCompanyEdited ? downloadCompany : downloadCompany || detectedFromJD.company;
   const resolvedDownloadRole = downloadRoleEdited ? downloadRole : downloadRole || detectedFromJD.role;
 
   const activeBaseName = useMemo(
-    () =>
-      buildDownloadBaseNameFromParts(
-        autoCandidateName,
-        resolvedDownloadCompany,
-        resolvedDownloadRole
-      ),
+    () => buildDownloadBaseNameFromParts(autoCandidateName, resolvedDownloadCompany, resolvedDownloadRole),
     [autoCandidateName, resolvedDownloadCompany, resolvedDownloadRole]
   );
+  const activeCoverLetterBaseName = useMemo(() => `${activeBaseName}_cover_letter`, [activeBaseName]);
 
   const canGenerate = !isGenerating && !!resumeDraft.trim() && !!jobDraft.trim();
   const canCompile = !isCompiling && !!editorTex.trim();
+  const canGenerateCoverLetter =
+    !isGeneratingCoverLetter && !!jobDraft.trim() && !!currentResumeSourceForLetter.trim();
+  const canCompileCoverLetter = !isCompilingCoverLetter && !!coverLetterTex.trim();
 
   useEffect(() => {
     if (useCanonical) {
@@ -276,6 +294,9 @@ export default function App() {
     return () => {
       if (pdfPreviewUrlRef.current) {
         URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      }
+      if (coverLetterPdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(coverLetterPdfPreviewUrlRef.current);
       }
     };
   }, []);
@@ -347,6 +368,27 @@ export default function App() {
     setIsPreviewStale(false);
   }
 
+  function clearCoverLetterPreview() {
+    if (coverLetterPdfPreviewUrlRef.current) {
+      URL.revokeObjectURL(coverLetterPdfPreviewUrlRef.current);
+      coverLetterPdfPreviewUrlRef.current = '';
+    }
+    setCoverLetterPdfPreviewUrl('');
+    setCoverLetterPdfPreviewFilename('optimized_cover_letter.pdf');
+    setIsCoverLetterPreviewStale(false);
+  }
+
+  function setCoverLetterPreview(blob, filename) {
+    const nextUrl = URL.createObjectURL(blob);
+    if (coverLetterPdfPreviewUrlRef.current) {
+      URL.revokeObjectURL(coverLetterPdfPreviewUrlRef.current);
+    }
+    coverLetterPdfPreviewUrlRef.current = nextUrl;
+    setCoverLetterPdfPreviewUrl(nextUrl);
+    setCoverLetterPdfPreviewFilename(filename);
+    setIsCoverLetterPreviewStale(false);
+  }
+
   function validateGenerateInputs() {
     const trimmedResume = resumeDraft.trim();
     const trimmedJD = jobDraft.trim();
@@ -358,6 +400,18 @@ export default function App() {
     const bytes = new TextEncoder().encode(trimmedResume).length;
     if (bytes > MAX_RESUME_BYTES) return `Resume exceeds ${MAX_RESUME_BYTES} bytes.`;
 
+    if (!trimmedJD) return 'Job description is required.';
+    if (trimmedJD.length > MAX_JD_CHARS) return `Job description exceeds ${MAX_JD_CHARS} characters.`;
+
+    return '';
+  }
+
+  function validateCoverLetterInputs() {
+    const trimmedResume = currentResumeSourceForLetter.trim();
+    const trimmedJD = jobDraft.trim();
+
+    if (!trimmedResume) return 'A resume source is required to generate a cover letter.';
+    if (!trimmedResume.includes('\\begin{document}')) return 'Cover letter generation currently expects a LaTeX resume source.';
     if (!trimmedJD) return 'Job description is required.';
     if (trimmedJD.length > MAX_JD_CHARS) return `Job description exceeds ${MAX_JD_CHARS} characters.`;
 
@@ -383,6 +437,25 @@ export default function App() {
     return version;
   }
 
+  function createCoverLetterVersion(tex, metadataValue) {
+    const nextNumber = coverLetterVersions.length + 1;
+    const version = {
+      id: `cl${nextNumber}-${Date.now()}`,
+      label: `cl${nextNumber}`,
+      timestamp: new Date().toLocaleString(),
+      tex,
+      metadata: metadataValue || null,
+    };
+
+    setCoverLetterVersions((prev) => [...prev, version]);
+    setSelectedCoverLetterVersionId(version.id);
+    setCoverLetterTex(tex);
+    setCoverLetterDirty(false);
+    setCoverLetterMetadata(metadataValue || null);
+
+    return version;
+  }
+
   function loadVersion(versionId) {
     const version = versions.find((item) => item.id === versionId);
     if (!version) return;
@@ -392,6 +465,17 @@ export default function App() {
     setEditorDirty(false);
     setMetadata(version.metadata || null);
     clearPdfPreview();
+  }
+
+  function loadCoverLetterVersion(versionId) {
+    const version = coverLetterVersions.find((item) => item.id === versionId);
+    if (!version) return;
+
+    setSelectedCoverLetterVersionId(version.id);
+    setCoverLetterTex(version.tex);
+    setCoverLetterDirty(false);
+    setCoverLetterMetadata(version.metadata || null);
+    clearCoverLetterPreview();
   }
 
   async function compileCurrent(options = {}) {
@@ -438,6 +522,50 @@ export default function App() {
     }
   }
 
+  async function compileCurrentCoverLetter(options = {}) {
+    const {
+      tex = coverLetterTex,
+      download = false,
+      label = selectedCoverLetterVersion?.label || 'working copy',
+      baseName = activeCoverLetterBaseName,
+    } = options;
+
+    if (!String(tex || '').trim()) {
+      setError('No cover letter LaTeX in editor to compile.');
+      return;
+    }
+
+    setError('');
+    setIsCompilingCoverLetter(true);
+
+    try {
+      const blob = await compilePdf(String(tex));
+      const fileName = `${baseName || 'optimized_cover_letter'}.pdf`;
+      setCoverLetterPreview(blob, fileName);
+
+      if (download) {
+        downloadBlob(blob, fileName);
+      }
+
+      appendLog('compile-cover-letter', `Compile success (${label})`, {
+        label,
+        filename: fileName,
+        size_bytes: blob.size,
+        editor_dirty: tex === coverLetterTex ? coverLetterDirty : false,
+      });
+    } catch (compileErr) {
+      const message = String(compileErr?.message || compileErr);
+      setError(message);
+      appendLog('compile-cover-letter', `Compile failed (${label})`, {
+        label,
+        error: message,
+        editor_dirty: tex === coverLetterTex ? coverLetterDirty : false,
+      });
+    } finally {
+      setIsCompilingCoverLetter(false);
+    }
+  }
+
   async function onGenerate() {
     setError('');
     const invalid = validateGenerateInputs();
@@ -449,7 +577,7 @@ export default function App() {
     setIsGenerating(true);
 
     try {
-      const data = await generateTex(resumeDraft, jobDraft);
+      const data = await generateTex(resumeDraft, jobDraft, contextNotes);
       const nextTex = data.optimized_tex || '';
       const version = createVersion(nextTex, data.metadata || null);
 
@@ -479,10 +607,68 @@ export default function App() {
     }
   }
 
+  async function onGenerateCoverLetter() {
+    setError('');
+    const invalid = validateCoverLetterInputs();
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+
+    setIsGeneratingCoverLetter(true);
+
+    try {
+      const data = await generateCoverLetter({
+        resumeTex: currentResumeSourceForLetter,
+        jobDescription: jobDraft,
+        contextNotes,
+        roleName: resolvedDownloadRole,
+        companyName: resolvedDownloadCompany,
+        hiringManager,
+        tone: coverLetterTone,
+        length: coverLetterLength,
+      });
+      const nextTex = data.cover_letter_tex || '';
+      const version = createCoverLetterVersion(nextTex, data.metadata || null);
+
+      setCoverLetterAppliedAt(new Date().toLocaleString());
+      setDrawerOpen(false);
+      clearCoverLetterPreview();
+
+      appendLog('generate-cover-letter', `Generated ${version.label}`, {
+        version: version.label,
+        optimizer: data.metadata?.optimizer || 'unknown',
+        tone: data.metadata?.tone || coverLetterTone,
+        length: data.metadata?.length || coverLetterLength,
+        skills_highlighted: data.metadata?.skills_highlighted || [],
+        evidence_used: data.metadata?.evidence_used || [],
+        tokens: data.metadata?.openai_tokens?.total || null,
+        warning: data.metadata?.warning || '',
+      });
+
+      await compileCurrentCoverLetter({ tex: nextTex, download: false, label: version.label });
+    } catch (err) {
+      const message = String(err?.message || err);
+      setError(message);
+      appendLog('generate-cover-letter', 'Generation failed', { error: message });
+    } finally {
+      setIsGeneratingCoverLetter(false);
+    }
+  }
+
   async function onCopyTex() {
     if (!editorTex) return;
     try {
       await navigator.clipboard.writeText(editorTex);
+    } catch {
+      setError('Clipboard copy failed.');
+    }
+  }
+
+  async function onCopyCoverLetterTex() {
+    if (!coverLetterTex) return;
+    try {
+      await navigator.clipboard.writeText(coverLetterTex);
     } catch {
       setError('Clipboard copy failed.');
     }
@@ -494,11 +680,17 @@ export default function App() {
     downloadBlob(blob, `${activeBaseName}.tex`);
   }
 
+  function onDownloadCoverLetterTex() {
+    if (!coverLetterTex) return;
+    const blob = new Blob([coverLetterTex], { type: 'application/x-tex' });
+    downloadBlob(blob, `${activeCoverLetterBaseName}.tex`);
+  }
+
   async function onDownloadPdf() {
     if (pdfPreviewUrl && !isPreviewStale) {
       const a = document.createElement('a');
       a.href = pdfPreviewUrl;
-      a.download = pdfPreviewFilename;
+      a.download = `${activeBaseName}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -506,6 +698,20 @@ export default function App() {
     }
 
     await compileCurrent({ download: true });
+  }
+
+  async function onDownloadCoverLetterPdf() {
+    if (coverLetterPdfPreviewUrl && !isCoverLetterPreviewStale) {
+      const a = document.createElement('a');
+      a.href = coverLetterPdfPreviewUrl;
+      a.download = `${activeCoverLetterBaseName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
+
+    await compileCurrentCoverLetter({ download: true });
   }
 
   function onEditorChange(value) {
@@ -516,6 +722,14 @@ export default function App() {
     }
   }
 
+  function onCoverLetterEditorChange(value) {
+    setCoverLetterTex(value);
+    setCoverLetterDirty(true);
+    if (coverLetterPdfPreviewUrl) {
+      setIsCoverLetterPreviewStale(true);
+    }
+  }
+
   function onAutofillDownloadName() {
     setDownloadCompany(detectedFromJD.company || '');
     setDownloadRole(detectedFromJD.role || '');
@@ -523,14 +737,9 @@ export default function App() {
     setDownloadRoleEdited(true);
   }
 
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <h1>ResumeTailor Pipeline</h1>
-        <p>input -&gt; generate -&gt; review -&gt; tweak -&gt; regenerate/compile -&gt; download</p>
-      </header>
-
-      <section className="toolbar card">
+  function renderResumeToolbar() {
+    return (
+      <>
         <div className="row">
           <button type="button" className="secondary" onClick={() => setDrawerOpen((v) => !v)}>
             {drawerOpen ? 'Hide Inputs' : 'Show Inputs'}
@@ -595,11 +804,146 @@ export default function App() {
             Download name: <code>{`${activeBaseName}.pdf`}</code>
           </div>
         </div>
+      </>
+    );
+  }
+
+  function renderPlusToolbar() {
+    return (
+      <>
+        <div className="row">
+          <button type="button" className="secondary" onClick={() => setDrawerOpen((v) => !v)}>
+            {drawerOpen ? 'Hide Inputs' : 'Show Inputs'}
+          </button>
+          <button type="button" onClick={onGenerateCoverLetter} disabled={!canGenerateCoverLetter}>
+            {isGeneratingCoverLetter ? 'Generating...' : 'Generate Cover Letter'}
+          </button>
+          <button type="button" onClick={() => void compileCurrentCoverLetter()} disabled={!canCompileCoverLetter}>
+            {isCompilingCoverLetter ? 'Compiling...' : 'Compile Current'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onDownloadCoverLetterPdf()}
+            disabled={!coverLetterTex.trim() || isCompilingCoverLetter}
+          >
+            Download .pdf
+          </button>
+          <button type="button" className="secondary" onClick={onDownloadCoverLetterTex} disabled={!coverLetterTex.trim()}>
+            Download .tex
+          </button>
+          <button type="button" className="secondary" onClick={onCopyCoverLetterTex} disabled={!coverLetterTex.trim()}>
+            Copy
+          </button>
+        </div>
+
+        <div className="row meta-row">
+          <span>Backend: <code>{BACKEND_URL}</code></span>
+          <span>Selected: <strong>{selectedCoverLetterVersion?.label || 'working copy'}</strong>{coverLetterDirty ? ' (edited)' : ''}</span>
+          <span>Tokens: <strong>{summarizeTokens(coverLetterMetadata?.openai_tokens?.total)}</strong></span>
+          <span>Applied inputs: <strong>{coverLetterAppliedAt || 'not yet'}</strong></span>
+        </div>
+
+        <div className="settings-grid">
+          <label className="filename-field">
+            Candidate (auto)
+            <input type="text" value={autoCandidateName} readOnly />
+          </label>
+          <label className="filename-field">
+            Company
+            <input
+              type="text"
+              value={downloadCompany}
+              onChange={(e) => {
+                setDownloadCompanyEdited(true);
+                setDownloadCompany(e.target.value);
+              }}
+              placeholder={detectedFromJD.company || 'target company'}
+            />
+          </label>
+          <label className="filename-field">
+            Role
+            <input
+              type="text"
+              value={downloadRole}
+              onChange={(e) => {
+                setDownloadRoleEdited(true);
+                setDownloadRole(e.target.value);
+              }}
+              placeholder={detectedFromJD.role || 'target role'}
+            />
+          </label>
+          <label className="filename-field">
+            Hiring Manager (optional)
+            <input
+              type="text"
+              value={hiringManager}
+              onChange={(e) => setHiringManager(e.target.value)}
+              placeholder="Defaults to Hiring Manager"
+            />
+          </label>
+          <label className="filename-field">
+            Tone
+            <select value={coverLetterTone} onChange={(e) => setCoverLetterTone(e.target.value)}>
+              {TONE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filename-field">
+            Length
+            <select value={coverLetterLength} onChange={(e) => setCoverLetterLength(e.target.value)}>
+              {LENGTH_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="secondary filename-autofill" onClick={onAutofillDownloadName}>
+            Auto-fill from JD
+          </button>
+          <div className="filename-preview">
+            Download name: <code>{`${activeCoverLetterBaseName}.pdf`}</code>
+          </div>
+          <div className="hint">
+            Plus uses the current resume working copy when available. Otherwise it uses the shared resume source and supplemental notes.
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <h1>ResumeTailor Pipeline</h1>
+        <p>input -&gt; generate -&gt; review -&gt; tweak -&gt; regenerate/compile -&gt; download</p>
+      </header>
+
+      <section className="tab-row">
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'resume' ? 'active' : ''}`}
+          onClick={() => setActiveTab('resume')}
+        >
+          Resume
+        </button>
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'plus' ? 'active' : ''}`}
+          onClick={() => setActiveTab('plus')}
+        >
+          Plus
+        </button>
       </section>
+
+      <section className="toolbar card">{activeTab === 'resume' ? renderResumeToolbar() : renderPlusToolbar()}</section>
 
       {drawerOpen ? (
         <section className="card drawer-card">
-          <h2>Inputs Drawer</h2>
+          <h2>{activeTab === 'resume' ? 'Resume Inputs' : 'Shared Inputs'}</h2>
           <div className="row">
             <label className="inline-check">
               <input type="checkbox" checked={useCanonical} onChange={onToggleCanonical} />
@@ -613,9 +957,9 @@ export default function App() {
             <input type="file" accept=".tex" onChange={onUploadFile} disabled={useCanonical} />
           </div>
 
-          <div className="drawer-grid">
+          <div className="drawer-grid drawer-grid-wide">
             <div>
-              <label>Resume source</label>
+              <label>Resume source (.tex)</label>
               <textarea
                 rows={11}
                 value={resumeDraft}
@@ -632,14 +976,25 @@ export default function App() {
                 placeholder="Paste job description"
               />
             </div>
+            <div className="drawer-span-full">
+              <label>Notes / supplemental context</label>
+              <textarea
+                rows={6}
+                value={contextNotes}
+                onChange={(e) => setContextNotes(e.target.value)}
+                placeholder="Add achievements, constraints, plain-text resume details, or direction you want the generators to consider."
+              />
+            </div>
           </div>
-          <div className="hint">Edits here do not change the workspace until you click Generate New Version.</div>
+          <div className="hint">
+            Shared inputs feed both tabs. Resume generation still expects LaTeX source. The supplemental notes field can hold plain-text context.
+          </div>
         </section>
       ) : null}
 
-      {versions.length ? (
+      {activeTab === 'resume' && versions.length ? (
         <section className="card version-card">
-          <h2>Version History</h2>
+          <h2>Resume Version History</h2>
           <div className="version-list">
             {versions
               .slice()
@@ -659,29 +1014,77 @@ export default function App() {
         </section>
       ) : null}
 
-      <section className="workspace-grid">
-        <section className="card panel-card">
-          <h2>Optimized LaTeX Editor (working copy)</h2>
-          <textarea
-            className="workspace-editor"
-            value={editorTex}
-            onChange={(e) => onEditorChange(e.target.value)}
-            placeholder="Generate a version to begin editing."
-          />
+      {activeTab === 'plus' && coverLetterVersions.length ? (
+        <section className="card version-card">
+          <h2>Cover Letter Version History</h2>
+          <div className="version-list">
+            {coverLetterVersions
+              .slice()
+              .reverse()
+              .map((version) => (
+                <button
+                  key={version.id}
+                  type="button"
+                  className={`version-item ${selectedCoverLetterVersionId === version.id ? 'active' : ''}`}
+                  onClick={() => loadCoverLetterVersion(version.id)}
+                >
+                  <span>{version.label}</span>
+                  <small>{version.timestamp}</small>
+                </button>
+              ))}
+          </div>
         </section>
+      ) : null}
 
-        <section className="card panel-card">
-          <h2>PDF Preview</h2>
-          {pdfPreviewUrl ? (
-            <>
-              {isPreviewStale ? <div className="hint stale">Preview is stale. Recompile current editor text.</div> : null}
-              <iframe title="PDF Preview" className="pdf-preview" src={pdfPreviewUrl} />
-            </>
-          ) : (
-            <div className="empty-preview">No compiled PDF yet. Compile current editor text to render preview.</div>
-          )}
+      {activeTab === 'resume' ? (
+        <section className="workspace-grid">
+          <section className="card panel-card">
+            <h2>Optimized LaTeX Editor (working copy)</h2>
+            <textarea
+              className="workspace-editor"
+              value={editorTex}
+              onChange={(e) => onEditorChange(e.target.value)}
+              placeholder="Generate a version to begin editing."
+            />
+          </section>
+
+          <section className="card panel-card">
+            <h2>PDF Preview</h2>
+            {pdfPreviewUrl ? (
+              <>
+                {isPreviewStale ? <div className="hint stale">Preview is stale. Recompile current editor text.</div> : null}
+                <iframe title="PDF Preview" className="pdf-preview" src={pdfPreviewUrl} />
+              </>
+            ) : (
+              <div className="empty-preview">No compiled PDF yet. Compile current editor text to render preview.</div>
+            )}
+          </section>
         </section>
-      </section>
+      ) : (
+        <section className="workspace-grid">
+          <section className="card panel-card">
+            <h2>Cover Letter LaTeX Editor (working copy)</h2>
+            <textarea
+              className="workspace-editor"
+              value={coverLetterTex}
+              onChange={(e) => onCoverLetterEditorChange(e.target.value)}
+              placeholder="Generate a cover letter to begin editing."
+            />
+          </section>
+
+          <section className="card panel-card">
+            <h2>PDF Preview</h2>
+            {coverLetterPdfPreviewUrl ? (
+              <>
+                {isCoverLetterPreviewStale ? <div className="hint stale">Preview is stale. Recompile current editor text.</div> : null}
+                <iframe title="Cover Letter PDF Preview" className="pdf-preview" src={coverLetterPdfPreviewUrl} />
+              </>
+            ) : (
+              <div className="empty-preview">No compiled PDF yet. Generate or compile the cover letter to render preview.</div>
+            )}
+          </section>
+        </section>
+      )}
 
       <details className="card logs-card" open={logsOpen} onToggle={(e) => setLogsOpen(e.currentTarget.open)}>
         <summary>Logs</summary>

@@ -29,6 +29,9 @@ Target Job Description:
 Candidate Resume LaTeX:
 {{RESUME_TEX}}
 
+Supplemental Context Notes:
+{{CONTEXT_NOTES}}
+
 Output requirements:
 - Prioritize ATS language alignment while preserving truth.
 - Keep one-page density high; avoid visible underfill.

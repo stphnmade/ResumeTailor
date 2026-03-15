@@ -409,7 +409,7 @@ export default async function handler(
   }
 
   try {
-    const { resume_tex, job_description } = req.body ?? {};
+    const { resume_tex, job_description, context_notes } = req.body ?? {};
 
     if (!resume_tex || !job_description) {
       return res.status(400).json({ error: "Missing input" });
@@ -424,6 +424,7 @@ export default async function handler(
       ...values,
       RESUME_TEX: sourceResumeTex,
       JOB_DESCRIPTION: sourceJobDescription,
+      CONTEXT_NOTES: String(context_notes || "").trim() || "None provided.",
     });
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
