@@ -15,11 +15,8 @@ Apply the following authoritative rule documents:
 [ATS Keywords Guidance]
 {{ATS_KEYWORDS_GUIDANCE}}
 
-[Canonical Source Resume]
+[Canonical Layout Guidance]
 {{CANONICAL_RESUME}}
-
-[Sample Job Description Reference]
-{{REFERENCE_JOB_DESCRIPTION}}
 
 Now optimize the candidate resume for the target job description under those rules.
 

@@ -65,6 +65,13 @@ type CompressionResult = {
   compressed: boolean;
 };
 
+type PromptContext = {
+  systemPrompt: string;
+  userPrompt: string;
+  values: Record<string, string>;
+  canonicalResume: string;
+};
+
 type SupportKeyword = {
   term: string;
   patterns: string[];
@@ -157,7 +164,6 @@ async function loadPromptAndRules() {
     formattingRules: path.join(rulesRoot, "rules/formatting_rules.md"),
     atsGuidance: path.join(rulesRoot, "rules/ats_keywords_guidance.md"),
     canonicalResume: path.join(rulesRoot, "resumes/stephen_syl_akinwale__resume__source.tex"),
-    referenceJD: path.join(rulesRoot, "examples/job_descriptions/l1_engineer__incedo.txt"),
     systemPrompt: path.join(promptsRoot, "system.md"),
     userPrompt: path.join(promptsRoot, "user.md"),
   };
@@ -169,7 +175,6 @@ async function loadPromptAndRules() {
     formattingRules,
     atsGuidance,
     canonicalResume,
-    referenceJD,
     systemPrompt,
     userPrompt,
   ] = await Promise.all([
@@ -179,7 +184,6 @@ async function loadPromptAndRules() {
     readFile(files.formattingRules, "utf8"),
     readFile(files.atsGuidance, "utf8"),
     readFile(files.canonicalResume, "utf8"),
-    readFile(files.referenceJD, "utf8"),
     readFile(files.systemPrompt, "utf8"),
     readFile(files.userPrompt, "utf8"),
   ]);
@@ -187,14 +191,13 @@ async function loadPromptAndRules() {
   return {
     systemPrompt,
     userPrompt,
+    canonicalResume,
     values: {
       TAILORING_RULES: tailoringRules,
       ALLOWED_CLAIMS: allowedClaims,
       FORBIDDEN_CLAIMS: forbiddenClaims,
       FORMATTING_RULES: formattingRules,
       ATS_KEYWORDS_GUIDANCE: atsGuidance,
-      CANONICAL_RESUME: canonicalResume,
-      REFERENCE_JOB_DESCRIPTION: referenceJD,
     },
   };
 }
@@ -722,6 +725,42 @@ function parseModelPayload(parsed: any): ModelPayload {
   };
 }
 
+function buildCanonicalLayoutGuidance(sourceResumeTex: string, canonicalResume: string): string {
+  const normalizedSource = sourceResumeTex.trim();
+  const normalizedCanonical = canonicalResume.trim();
+
+  if (normalizedSource === normalizedCanonical) {
+    return [
+      "The candidate resume source is already the canonical layout baseline.",
+      "Preserve its preamble, macros, section order, and visual structure exactly.",
+      "Only tailor entry selection, bullet wording, and bullet counts within that existing layout.",
+    ].join("\n");
+  }
+
+  return [
+    "Use the candidate resume source as the direct LaTeX base.",
+    "Match the canonical layout style: Jake-style one-page resume, same macro family, same section order.",
+    "Preserve the candidate resume preamble exactly and do not redesign layout.",
+  ].join("\n");
+}
+
+function buildPromptContext(
+  promptContext: PromptContext,
+  sourceResumeTex: string,
+  sourceJobDescription: string,
+  contextNotes: string,
+  recruiterNotes: string
+): string {
+  return renderTemplate(promptContext.userPrompt, {
+    ...promptContext.values,
+    CANONICAL_RESUME: buildCanonicalLayoutGuidance(sourceResumeTex, promptContext.canonicalResume),
+    RESUME_TEX: sourceResumeTex,
+    JOB_DESCRIPTION: sourceJobDescription,
+    CONTEXT_NOTES: contextNotes,
+    RECRUITER_NOTES: recruiterNotes,
+  });
+}
+
 async function runOptimizationPass(
   client: OpenAI,
   model: string,
@@ -735,6 +774,7 @@ async function runOptimizationPass(
 
   const response = await client.responses.create({
     model,
+    reasoning: { effort: "low" },
     input: [
       {
         role: "system",
@@ -793,18 +833,18 @@ export default async function handler(
     const sourceJobDescription = String(job_description);
     const supportKeywordTargets = deriveSupportKeywordsFromJD(sourceJobDescription);
 
-    const { systemPrompt, userPrompt, values } = await loadPromptAndRules();
-    const renderedUserPrompt = renderTemplate(userPrompt, {
-      ...values,
-      RESUME_TEX: sourceResumeTex,
-      JOB_DESCRIPTION: sourceJobDescription,
-      CONTEXT_NOTES: String(context_notes || "").trim() || "None provided.",
-      RECRUITER_NOTES: String(recruiter_notes || "").trim() || "None provided.",
-    });
+    const promptContext = await loadPromptAndRules();
+    const renderedUserPrompt = buildPromptContext(
+      promptContext,
+      sourceResumeTex,
+      sourceJobDescription,
+      String(context_notes || "").trim() || "None provided.",
+      String(recruiter_notes || "").trim() || "None provided."
+    );
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-5";
 
     if (!apiKey) {
       return res.status(200).json({
@@ -836,7 +876,7 @@ export default async function handler(
 
     let firstPass: OptimizationPassResult;
     try {
-      firstPass = await runOptimizationPass(client, model, systemPrompt, renderedUserPrompt);
+      firstPass = await runOptimizationPass(client, model, promptContext.systemPrompt, renderedUserPrompt);
     } catch (openaiErr: any) {
       const details = summarizeError(openaiErr);
       return res.status(200).json({
@@ -904,52 +944,13 @@ export default async function handler(
           : finalOutput.includedProjects,
     };
     let validation = validateOptimization(finalOutput.optimizedTex, supportKeywordTargets);
-    let regenerationAttempted = false;
-    let regenerationFailedMessage = "";
+    const regenerationAttempted = false;
     let finalResponseId = firstPass.responseId;
-    let secondPassUsage: TokenUsage | undefined;
     let totalTokenUsage = addTokenUsage(zeroTokenUsage(), firstPass.usage);
-
-    if (!validation.ok) {
-      regenerationAttempted = true;
-      const correctionMessage = buildCorrectionMessage(validation);
-      try {
-        const secondPass = await runOptimizationPass(
-          client,
-          model,
-          systemPrompt,
-          renderedUserPrompt,
-          correctionMessage
-        );
-        secondPassUsage = secondPass.usage;
-        finalResponseId = secondPass.responseId || finalResponseId;
-        totalTokenUsage = addTokenUsage(totalTokenUsage, secondPass.usage);
-
-        if (secondPass.payload.optimizedTex) {
-          compression = compressResumeToOnePage(secondPass.payload.optimizedTex, sourceJobDescription, supportKeywordTargets);
-          finalOutput = {
-            ...secondPass.payload,
-            optimizedTex: compression.tex,
-            removedProjects: [...new Set([...secondPass.payload.removedProjects, ...compression.removedProjects])],
-            includedProjects:
-              compression.includedProjects.length > 0
-                ? compression.includedProjects
-                : secondPass.payload.includedProjects,
-          };
-          validation = validateOptimization(finalOutput.optimizedTex, supportKeywordTargets);
-        }
-      } catch (retryErr: any) {
-        const retryDetails = summarizeError(retryErr);
-        regenerationFailedMessage = `${retryDetails.name}: ${retryDetails.message}`;
-      }
-    }
 
     const warnings: string[] = [];
     if (!validation.ok) {
-      warnings.push(`POST_VALIDATION_FAILED_AFTER_RETRY:${validation.failures.join(",")}`);
-    }
-    if (regenerationAttempted && regenerationFailedMessage) {
-      warnings.push(`REGENERATION_REQUEST_FAILED:${regenerationFailedMessage}`);
+      warnings.push(`POST_VALIDATION_FAILED:${validation.failures.join(",")}`);
     }
 
     return res.status(200).json({
@@ -979,7 +980,6 @@ export default async function handler(
         openai_response_id: finalResponseId,
         openai_tokens: {
           pass_1: firstPass.usage,
-          pass_2: secondPassUsage,
           total: totalTokenUsage,
         },
       },
