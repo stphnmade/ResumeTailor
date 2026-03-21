@@ -208,6 +208,7 @@ export default function App() {
   const [resumeDraft, setResumeDraft] = useState('');
   const [jobDraft, setJobDraft] = useState('');
   const [contextNotes, setContextNotes] = useState('');
+  const [recruiterNotes, setRecruiterNotes] = useState('');
   const [useCanonical, setUseCanonical] = useState(true);
   const [isLoadingCanonical, setIsLoadingCanonical] = useState(false);
 
@@ -576,7 +577,7 @@ export default function App() {
     setIsGenerating(true);
 
     try {
-      const data = await generateTex(resumeDraft, jobDraft, contextNotes);
+      const data = await generateTex(resumeDraft, jobDraft, contextNotes, recruiterNotes);
       const nextTex = data.optimized_tex || '';
       const version = createVersion(nextTex, data.metadata || null);
 
@@ -621,6 +622,7 @@ export default function App() {
         resumeTex: currentResumeSourceForLetter,
         jobDescription: jobDraft,
         contextNotes,
+        recruiterNotes,
         roleName: resolvedDownloadRole,
         companyName: resolvedDownloadCompany,
         hiringManager,
@@ -974,17 +976,26 @@ export default function App() {
               />
             </div>
             <div className="drawer-span-full">
-              <label>Notes / supplemental context</label>
+              <label>Notes / factual supplemental context</label>
               <textarea
-                rows={6}
+                rows={5}
                 value={contextNotes}
                 onChange={(e) => setContextNotes(e.target.value)}
-                placeholder="Add achievements, constraints, plain-text resume details, or direction you want the generators to consider."
+                placeholder="Add verified details, constraints, or plain-text resume context the generator may use as source material."
+              />
+            </div>
+            <div className="drawer-span-full">
+              <label>Recruiter notes / extra instructions</label>
+              <textarea
+                rows={5}
+                value={recruiterNotes}
+                onChange={(e) => setRecruiterNotes(e.target.value)}
+                placeholder="Add emphasis instructions such as: lead with IT support, prioritize healthcare hardware, prefer 2 projects, or sound more recruiter-friendly. Unsupported instructions will be ignored."
               />
             </div>
           </div>
           <div className="hint">
-            Shared inputs feed both tabs. Resume generation still expects LaTeX source. The supplemental notes field can hold plain-text context.
+            Shared inputs feed both tabs. Factual notes add source context. Recruiter notes act as additive prompt instructions and cannot override truth or one-page constraints.
           </div>
         </section>
       ) : null}

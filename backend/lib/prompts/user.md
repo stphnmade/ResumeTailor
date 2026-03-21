@@ -32,9 +32,13 @@ Candidate Resume LaTeX:
 Supplemental Context Notes:
 {{CONTEXT_NOTES}}
 
+Recruiter Instruction Notes:
+{{RECRUITER_NOTES}}
+
 Output requirements:
 - Prioritize ATS language alignment while preserving truth.
-- Keep one-page density high; avoid visible underfill.
+- Keep the resume to one page; never choose comprehensiveness over page fit.
+- Follow recruiter instruction notes only when they are consistent with source truth and the one-page budget.
 - Explicitly include support keywords in bullets where supported by existing evidence.
 - Keep claims strictly truthful to source material.
 - Return only the required JSON object with metadata.

@@ -31,6 +31,9 @@ type ValidationResult = {
   failures: string[];
   projectCount: number;
   bulletCount: number;
+  experienceEntryCount: number;
+  experienceBulletCount: number;
+  projectBulletCount: number;
   keywordCoverage: string[];
   keywordTargets: string[];
   requiredCoverage: number;
@@ -227,6 +230,14 @@ function countMatches(text: string, regex: RegExp): number {
   return (text.match(regex) || []).length;
 }
 
+function extractSectionBody(tex: string, sectionName: string): string {
+  const escapedSectionName = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = tex.match(
+    new RegExp(`\\\\section\\{${escapedSectionName}\\}([\\s\\S]*?)(?=\\\\section\\{|\\\\end\\{document\\})`)
+  );
+  return match?.[1] || "";
+}
+
 function computeKeywordCoverage(optimizedTex: string, targets: string[]): string[] {
   const tex = normalizeText(optimizedTex);
   const covered: string[] = [];
@@ -243,8 +254,13 @@ function computeKeywordCoverage(optimizedTex: string, targets: string[]): string
 }
 
 function validateOptimization(optimizedTex: string, keywordTargets: string[]): ValidationResult {
-  const projectCount = countMatches(optimizedTex, /\\resumeProjectHeading\s*\{/g);
+  const experienceSection = extractSectionBody(optimizedTex, "Experience");
+  const projectsSection = extractSectionBody(optimizedTex, "Projects");
+  const projectCount = countMatches(projectsSection, /\\resumeProjectHeading\s*\{/g);
   const bulletCount = countMatches(optimizedTex, /\\resumeItem\s*\{/g);
+  const experienceEntryCount = countMatches(experienceSection, /\\resumeSubheading\s*\{/g);
+  const experienceBulletCount = countMatches(experienceSection, /\\resumeItem\s*\{/g);
+  const projectBulletCount = countMatches(projectsSection, /\\resumeItem\s*\{/g);
   const keywordCoverage = computeKeywordCoverage(optimizedTex, keywordTargets);
   const requiredCoverage = Math.min(8, keywordTargets.length);
 
@@ -252,8 +268,20 @@ function validateOptimization(optimizedTex: string, keywordTargets: string[]): V
   if (projectCount < 2 || projectCount > 3) {
     failures.push(`PROJECT_COUNT_OUT_OF_RANGE:${projectCount}`);
   }
+  if (experienceEntryCount < 2 || experienceEntryCount > 4) {
+    failures.push(`EXPERIENCE_ENTRY_COUNT_OUT_OF_RANGE:${experienceEntryCount}`);
+  }
   if (bulletCount < 11) {
     failures.push(`BULLET_COUNT_TOO_LOW:${bulletCount}`);
+  }
+  if (bulletCount > 18) {
+    failures.push(`BULLET_COUNT_TOO_HIGH:${bulletCount}`);
+  }
+  if (experienceBulletCount > 12) {
+    failures.push(`EXPERIENCE_BULLET_COUNT_TOO_HIGH:${experienceBulletCount}`);
+  }
+  if (projectBulletCount > 6) {
+    failures.push(`PROJECT_BULLET_COUNT_TOO_HIGH:${projectBulletCount}`);
   }
   if (keywordCoverage.length < requiredCoverage) {
     failures.push(`KEYWORD_COVERAGE_TOO_LOW:${keywordCoverage.length}/${requiredCoverage}`);
@@ -264,6 +292,9 @@ function validateOptimization(optimizedTex: string, keywordTargets: string[]): V
     failures,
     projectCount,
     bulletCount,
+    experienceEntryCount,
+    experienceBulletCount,
+    projectBulletCount,
     keywordCoverage,
     keywordTargets,
     requiredCoverage,
@@ -276,11 +307,15 @@ function buildCorrectionMessage(validation: ValidationResult): string {
   return [
     "Regenerate once to satisfy deterministic constraints.",
     "Do not fabricate any content.",
-    "Keep LaTeX valid and one-page dense.",
+    "Keep LaTeX valid and keep the resume to one page.",
     `Current failures: ${validation.failures.join(", ")}`,
     "Required corrections:",
-    "- include exactly 2-3 projects with strongest JD alignment",
-    "- ensure total bullet count is at least 11",
+    "- keep only the strongest 3-4 experience entries",
+    "- include 2-3 projects with strongest JD alignment, preferring 2 if space is tight",
+    "- ensure total bullet count is between 11 and 18",
+    "- keep project bullets to 6 or fewer total",
+    "- keep experience bullets to 12 or fewer total",
+    "- compress bullets before adding detail",
     `- ensure keyword coverage reaches at least ${validation.requiredCoverage}`,
     `- add truthful language covering missing terms where evidence exists: ${missing.join(", ") || "none"}`,
   ].join("\n");
@@ -409,7 +444,7 @@ export default async function handler(
   }
 
   try {
-    const { resume_tex, job_description, context_notes } = req.body ?? {};
+    const { resume_tex, job_description, context_notes, recruiter_notes } = req.body ?? {};
 
     if (!resume_tex || !job_description) {
       return res.status(400).json({ error: "Missing input" });
@@ -425,6 +460,7 @@ export default async function handler(
       RESUME_TEX: sourceResumeTex,
       JOB_DESCRIPTION: sourceJobDescription,
       CONTEXT_NOTES: String(context_notes || "").trim() || "None provided.",
+      RECRUITER_NOTES: String(recruiter_notes || "").trim() || "None provided.",
     });
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
@@ -442,6 +478,9 @@ export default async function handler(
           coverage_total: 0,
           removed_projects: [],
           included_projects: [],
+          experience_entry_count: 0,
+          experience_bullet_count: 0,
+          project_bullet_count: 0,
           optimizer: "fallback",
           model: "none",
           warning: "OPENAI_UNAVAILABLE_FALLBACK",
@@ -471,6 +510,9 @@ export default async function handler(
           coverage_total: 0,
           removed_projects: [],
           included_projects: [],
+          experience_entry_count: 0,
+          experience_bullet_count: 0,
+          project_bullet_count: 0,
           optimizer: "fallback",
           model,
           warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
@@ -495,6 +537,9 @@ export default async function handler(
           coverage_total: 0,
           removed_projects: [],
           included_projects: [],
+          experience_entry_count: 0,
+          experience_bullet_count: 0,
+          project_bullet_count: 0,
           optimizer: "fallback",
           model,
           warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
@@ -561,6 +606,9 @@ export default async function handler(
         included_projects: finalOutput.includedProjects,
         project_count: validation.projectCount,
         bullet_count: validation.bulletCount,
+        experience_entry_count: validation.experienceEntryCount,
+        experience_bullet_count: validation.experienceBulletCount,
+        project_bullet_count: validation.projectBulletCount,
         regeneration_attempted: regenerationAttempted,
         validator_failures: validation.failures,
         optimizer: "openai",

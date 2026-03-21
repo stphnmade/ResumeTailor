@@ -14,6 +14,9 @@ export type GenerateTexResponse = {
     coverage_total?: number;
     project_count?: number;
     bullet_count?: number;
+    experience_entry_count?: number;
+    experience_bullet_count?: number;
+    project_bullet_count?: number;
     validator_failures?: string[];
     regeneration_attempted?: boolean;
     warning?: string;
@@ -98,7 +101,8 @@ export async function health() {
 export async function generateTex(
   resumeTex: string,
   jobDescription: string,
-  contextNotes = ''
+  contextNotes = '',
+  recruiterNotes = ''
 ): Promise<GenerateTexResponse> {
   const res = await fetch(`${BACKEND_URL}/api/generate-tex`, {
     method: 'POST',
@@ -109,6 +113,7 @@ export async function generateTex(
       resume_tex: resumeTex,
       job_description: jobDescription,
       context_notes: contextNotes,
+      recruiter_notes: recruiterNotes,
     }),
   });
 
@@ -123,6 +128,7 @@ export async function generateCoverLetter(params: {
   resumeTex: string;
   jobDescription: string;
   contextNotes?: string;
+  recruiterNotes?: string;
   roleName?: string;
   companyName?: string;
   hiringManager?: string;
@@ -138,6 +144,7 @@ export async function generateCoverLetter(params: {
       resume_tex: params.resumeTex,
       job_description: params.jobDescription,
       context_notes: params.contextNotes || '',
+      recruiter_notes: params.recruiterNotes || '',
       role_name: params.roleName || '',
       company_name: params.companyName || '',
       hiring_manager: params.hiringManager || '',

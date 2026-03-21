@@ -29,6 +29,9 @@ Candidate Resume LaTeX:
 Supplemental Context Notes:
 {{CONTEXT_NOTES}}
 
+Recruiter Instruction Notes:
+{{RECRUITER_NOTES}}
+
 Output requirements:
 - Produce exactly 3 body paragraphs.
 - Keep every claim grounded in the provided evidence.
