@@ -46,7 +46,6 @@ class OpenAIClient:
     def _run_json_prompt(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         response = self._client.responses.create(
             model=self.model,
-            temperature=0.2,
             input=[
                 {
                     "role": "system",

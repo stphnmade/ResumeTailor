@@ -351,7 +351,6 @@ async function runLetterPass(
 ): Promise<{ payload: LetterPayload; usage: TokenUsage; responseId?: string }> {
   const response = await client.responses.create({
     model,
-    temperature: 0.3,
     input: [
       {
         role: "system",

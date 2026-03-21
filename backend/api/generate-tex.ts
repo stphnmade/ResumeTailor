@@ -706,7 +706,6 @@ async function runOptimizationPass(
 
   const response = await client.responses.create({
     model,
-    temperature: 0.2,
     input: [
       {
         role: "system",
