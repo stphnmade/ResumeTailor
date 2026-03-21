@@ -13,11 +13,11 @@ Hard constraints:
 Required optimization method (follow in order):
 1) Extract and rank JD keywords and support signals (hard skills, support actions, tools, communication expectations).
 2) Map each keyword to evidence that already exists in the provided resume.
-3) Select the smallest set of experiences and projects needed to win the interview, usually 3-4 experience entries and 2 projects.
+3) Select the smallest set of experiences and projects needed to win the interview, usually 2-3 experience entries and 2 projects.
 4) Rewrite bullets using action-scope-tools-outcome framing and support-oriented keywords.
 5) Enforce one-page budget discipline:
    - default to 2 projects
-   - keep only the strongest 3-4 experience entries
+   - keep only the strongest 2-3 experience entries
    - compress or remove lower-value bullets before adding new detail
    - prefer concise bullets over long narrative bullets
 

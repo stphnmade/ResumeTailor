@@ -17,6 +17,9 @@ export type GenerateTexResponse = {
     experience_entry_count?: number;
     experience_bullet_count?: number;
     project_bullet_count?: number;
+    estimated_line_count?: number;
+    compressed_by_postprocessor?: boolean;
+    removed_experience_entries?: string[];
     validator_failures?: string[];
     regeneration_attempted?: boolean;
     warning?: string;

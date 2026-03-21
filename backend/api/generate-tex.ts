@@ -34,9 +34,34 @@ type ValidationResult = {
   experienceEntryCount: number;
   experienceBulletCount: number;
   projectBulletCount: number;
+  estimatedLineCount: number;
   keywordCoverage: string[];
   keywordTargets: string[];
   requiredCoverage: number;
+};
+
+type ResumeBullet = {
+  raw: string;
+  content: string;
+};
+
+type ResumeEntry = {
+  raw: string;
+  headingText: string;
+  bullets: ResumeBullet[];
+  score: number;
+  start: number;
+  pinned: boolean;
+  isCurrent: boolean;
+};
+
+type CompressionResult = {
+  tex: string;
+  removedProjects: string[];
+  includedProjects: string[];
+  removedExperienceHeadings: string[];
+  estimatedLineCount: number;
+  compressed: boolean;
 };
 
 type SupportKeyword = {
@@ -61,6 +86,16 @@ const SUPPORT_KEYWORDS: SupportKeyword[] = [
   { term: "monitoring", patterns: ["monitor", "monitoring", "uptime", "performance"] },
   { term: "ownership", patterns: ["ownership", "urgency", "accountability"] },
 ];
+
+const START_LIST = "\\resumeItemListStart";
+const END_LIST = "\\resumeItemListEnd";
+const RESUME_ITEM = "\\resumeItem{";
+const STOP_WORDS = new Set([
+  "the", "and", "for", "with", "you", "your", "our", "a", "an", "to", "of", "in", "on",
+  "is", "are", "as", "be", "or", "by", "this", "that", "will", "from", "using", "use",
+  "have", "has", "we", "their", "at", "it", "role", "job", "work", "team", "support",
+]);
+const MAX_ESTIMATED_LINES = 56;
 
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
@@ -238,6 +273,275 @@ function extractSectionBody(tex: string, sectionName: string): string {
   return match?.[1] || "";
 }
 
+function replaceSectionBody(tex: string, sectionName: string, nextBody: string): string {
+  const escapedSectionName = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return tex.replace(
+    new RegExp(`(\\\\section\\{${escapedSectionName}\\})([\\s\\S]*?)(?=\\\\section\\{|\\\\end\\{document\\})`),
+    `$1${nextBody}`
+  );
+}
+
+function findMatchingBrace(text: string, openBraceIndex: number): number {
+  let depth = 0;
+  for (let index = openBraceIndex; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function extractBullets(text: string): ResumeBullet[] {
+  const bullets: ResumeBullet[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const itemIndex = text.indexOf(RESUME_ITEM, cursor);
+    if (itemIndex === -1) break;
+    const braceIndex = itemIndex + "\\resumeItem".length;
+    const closeIndex = findMatchingBrace(text, braceIndex);
+    if (closeIndex === -1) break;
+
+    bullets.push({
+      raw: text.slice(itemIndex, closeIndex + 1),
+      content: text.slice(braceIndex + 1, closeIndex).trim(),
+    });
+
+    cursor = closeIndex + 1;
+  }
+
+  return bullets;
+}
+
+function extractScoringTerms(jobDescription: string): string[] {
+  const tokens = normalizeText(jobDescription)
+    .split(/\s+/)
+    .filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
+
+  const counts = new Map<string, number>();
+  for (const token of tokens) {
+    counts.set(token, (counts.get(token) || 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 24)
+    .map(([token]) => token);
+}
+
+function countTermHits(text: string, terms: string[]): number {
+  const normalized = normalizeText(text);
+  return terms.reduce((hits, term) => hits + (normalized.includes(term) ? 1 : 0), 0);
+}
+
+function extractEntries(sectionBody: string, macroName: string): ResumeEntry[] {
+  const macro = `\\${macroName}`;
+  const starts: number[] = [];
+  let cursor = 0;
+
+  while (cursor < sectionBody.length) {
+    const index = sectionBody.indexOf(macro, cursor);
+    if (index === -1) break;
+    starts.push(index);
+    cursor = index + macro.length;
+  }
+
+  return starts.map((start, idx) => {
+    const end = idx + 1 < starts.length ? starts[idx + 1] : sectionBody.length;
+    const raw = sectionBody.slice(start, end);
+    const headingText = normalizeText(raw.slice(0, Math.min(raw.indexOf(START_LIST), 220)).trim() || raw.slice(0, 220));
+    return {
+      raw,
+      headingText,
+      bullets: extractBullets(raw),
+      score: 0,
+      start,
+      pinned: false,
+      isCurrent: /\bpresent\b/.test(headingText),
+    };
+  });
+}
+
+function scoreEntry(
+  entry: ResumeEntry,
+  jdTerms: string[],
+  supportKeywordTargets: string[],
+  section: "experience" | "projects"
+): ResumeEntry {
+  const rawText = normalizeText(entry.raw);
+  const bulletText = entry.bullets.map((bullet) => bullet.content).join(" ");
+  const keywordHits = countTermHits(rawText, jdTerms);
+  const supportHits = countTermHits(rawText, supportKeywordTargets);
+  const metrics = (bulletText.match(/\b\d+(?:\.\d+)?%?\b/g) || []).length;
+  const pinned =
+    entry.isCurrent ||
+    (section === "experience" &&
+      /\b(it|technical support|technician|helpdesk|support|health|jamf|google admin|tdx|office 365|network)\b/.test(rawText) &&
+      supportHits > 0);
+
+  return {
+    ...entry,
+    pinned,
+    score:
+      keywordHits * 2.5 +
+      supportHits * 2 +
+      Math.min(metrics, 3) * 0.5 +
+      (entry.isCurrent ? 2 : 0) +
+      (pinned ? 1.5 : 0),
+  };
+}
+
+function trimEntryBullets(entry: ResumeEntry, maxBullets: number, jdTerms: string[]): ResumeEntry {
+  if (!entry.bullets.length || entry.bullets.length <= maxBullets) return entry;
+
+  const startIndex = entry.raw.indexOf(START_LIST);
+  const endIndex = entry.raw.indexOf(END_LIST, startIndex + START_LIST.length);
+  if (startIndex === -1 || endIndex === -1) return entry;
+
+  const ranked = [...entry.bullets]
+    .map((bullet) => ({
+      ...bullet,
+      score: countTermHits(bullet.content, jdTerms) * 2 + (/\b\d+(?:\.\d+)?%?\b/.test(bullet.content) ? 0.5 : 0),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxBullets);
+
+  const selected = entry.bullets.filter((bullet) => ranked.some((candidate) => candidate.raw === bullet.raw));
+  const prefix = entry.raw.slice(0, startIndex + START_LIST.length);
+  const suffix = entry.raw.slice(endIndex);
+  const nextRaw = `${prefix}\n${selected.map((bullet) => bullet.raw).join("\n")}\n${suffix}`;
+
+  return {
+    ...entry,
+    raw: nextRaw,
+    bullets: selected,
+  };
+}
+
+function selectEntries(
+  entries: ResumeEntry[],
+  keepCount: number,
+  jdTerms: string[],
+  supportKeywordTargets: string[],
+  section: "experience" | "projects"
+): ResumeEntry[] {
+  const scored = entries.map((entry) => scoreEntry(entry, jdTerms, supportKeywordTargets, section));
+  const selected: ResumeEntry[] = [];
+
+  const pinned = scored.filter((entry) => entry.pinned).sort((a, b) => b.score - a.score);
+  for (const entry of pinned) {
+    if (selected.length >= keepCount) break;
+    if (!selected.some((candidate) => candidate.start === entry.start)) {
+      selected.push(entry);
+    }
+  }
+
+  for (const entry of [...scored].sort((a, b) => b.score - a.score)) {
+    if (selected.length >= keepCount) break;
+    if (!selected.some((candidate) => candidate.start === entry.start)) {
+      selected.push(entry);
+    }
+  }
+
+  return selected
+    .sort((a, b) => a.start - b.start)
+    .map((entry, idx) =>
+      trimEntryBullets(
+        entry,
+        section === "experience" ? (idx === 0 ? 4 : 2) : 2,
+        jdTerms
+      )
+    );
+}
+
+function estimateRenderedLines(tex: string): number {
+  const sectionCount = countMatches(tex, /\\section\{/g);
+  const experienceCount = countMatches(extractSectionBody(tex, "Experience"), /\\resumeSubheading\s*\{/g);
+  const projectCount = countMatches(extractSectionBody(tex, "Projects"), /\\resumeProjectHeading\s*\{/g);
+  const bullets = extractBullets(tex);
+  const bulletLines = bullets.reduce((sum, bullet) => {
+    const plain = normalizeText(bullet.content);
+    return sum + Math.max(1, Math.ceil(plain.length / 88));
+  }, 0);
+  const skillsSection = extractSectionBody(tex, "Technical Skills");
+  const skillsLines = Math.max(1, countMatches(skillsSection, /\\\\/g) + 1);
+
+  return 3 + sectionCount * 2 + experienceCount * 2 + projectCount * 2 + bulletLines + skillsLines;
+}
+
+function compressResumeToOnePage(
+  tex: string,
+  jobDescription: string,
+  supportKeywordTargets: string[]
+): CompressionResult {
+  const experienceBody = extractSectionBody(tex, "Experience");
+  const projectsBody = extractSectionBody(tex, "Projects");
+  if (!experienceBody || !projectsBody) {
+    return {
+      tex,
+      removedProjects: [],
+      includedProjects: [],
+      removedExperienceHeadings: [],
+      estimatedLineCount: estimateRenderedLines(tex),
+      compressed: false,
+    };
+  }
+
+  const jdTerms = extractScoringTerms(jobDescription);
+  const experienceEntries = extractEntries(experienceBody, "resumeSubheading");
+  const projectEntries = extractEntries(projectsBody, "resumeProjectHeading");
+  if (!experienceEntries.length || !projectEntries.length) {
+    return {
+      tex,
+      removedProjects: [],
+      includedProjects: [],
+      removedExperienceHeadings: [],
+      estimatedLineCount: estimateRenderedLines(tex),
+      compressed: false,
+    };
+  }
+
+  let selectedExperience = selectEntries(experienceEntries, 3, jdTerms, supportKeywordTargets, "experience");
+  let selectedProjects = selectEntries(projectEntries, 2, jdTerms, supportKeywordTargets, "projects");
+
+  let nextTex = replaceSectionBody(tex, "Experience", `\n${selectedExperience.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+  nextTex = replaceSectionBody(nextTex, "Projects", `\n${selectedProjects.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+
+  let estimatedLineCount = estimateRenderedLines(nextTex);
+
+  if (estimatedLineCount > MAX_ESTIMATED_LINES && selectedExperience.length > 2) {
+    selectedExperience = selectEntries(experienceEntries, 2, jdTerms, supportKeywordTargets, "experience");
+    nextTex = replaceSectionBody(tex, "Experience", `\n${selectedExperience.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+    nextTex = replaceSectionBody(nextTex, "Projects", `\n${selectedProjects.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+    estimatedLineCount = estimateRenderedLines(nextTex);
+  }
+
+  const includedProjects = selectedProjects.map((entry) => entry.headingText.slice(0, 120)).filter(Boolean);
+  const removedProjects = projectEntries
+    .filter((entry) => !selectedProjects.some((candidate) => candidate.start === entry.start))
+    .map((entry) => entry.headingText.slice(0, 120))
+    .filter(Boolean);
+  const removedExperienceHeadings = experienceEntries
+    .filter((entry) => !selectedExperience.some((candidate) => candidate.start === entry.start))
+    .map((entry) => entry.headingText.slice(0, 120))
+    .filter(Boolean);
+
+  return {
+    tex: nextTex,
+    removedProjects,
+    includedProjects,
+    removedExperienceHeadings,
+    estimatedLineCount,
+    compressed:
+      removedProjects.length > 0 ||
+      removedExperienceHeadings.length > 0 ||
+      nextTex !== tex,
+  };
+}
+
 function computeKeywordCoverage(optimizedTex: string, targets: string[]): string[] {
   const tex = normalizeText(optimizedTex);
   const covered: string[] = [];
@@ -261,6 +565,7 @@ function validateOptimization(optimizedTex: string, keywordTargets: string[]): V
   const experienceEntryCount = countMatches(experienceSection, /\\resumeSubheading\s*\{/g);
   const experienceBulletCount = countMatches(experienceSection, /\\resumeItem\s*\{/g);
   const projectBulletCount = countMatches(projectsSection, /\\resumeItem\s*\{/g);
+  const estimatedLineCount = estimateRenderedLines(optimizedTex);
   const keywordCoverage = computeKeywordCoverage(optimizedTex, keywordTargets);
   const requiredCoverage = Math.min(8, keywordTargets.length);
 
@@ -268,20 +573,23 @@ function validateOptimization(optimizedTex: string, keywordTargets: string[]): V
   if (projectCount < 2 || projectCount > 3) {
     failures.push(`PROJECT_COUNT_OUT_OF_RANGE:${projectCount}`);
   }
-  if (experienceEntryCount < 2 || experienceEntryCount > 4) {
+  if (experienceEntryCount < 2 || experienceEntryCount > 3) {
     failures.push(`EXPERIENCE_ENTRY_COUNT_OUT_OF_RANGE:${experienceEntryCount}`);
   }
   if (bulletCount < 11) {
     failures.push(`BULLET_COUNT_TOO_LOW:${bulletCount}`);
   }
-  if (bulletCount > 18) {
+  if (bulletCount > 16) {
     failures.push(`BULLET_COUNT_TOO_HIGH:${bulletCount}`);
   }
-  if (experienceBulletCount > 12) {
+  if (experienceBulletCount > 10) {
     failures.push(`EXPERIENCE_BULLET_COUNT_TOO_HIGH:${experienceBulletCount}`);
   }
   if (projectBulletCount > 6) {
     failures.push(`PROJECT_BULLET_COUNT_TOO_HIGH:${projectBulletCount}`);
+  }
+  if (estimatedLineCount > MAX_ESTIMATED_LINES) {
+    failures.push(`ESTIMATED_PAGE_OVERFLOW:${estimatedLineCount}`);
   }
   if (keywordCoverage.length < requiredCoverage) {
     failures.push(`KEYWORD_COVERAGE_TOO_LOW:${keywordCoverage.length}/${requiredCoverage}`);
@@ -295,6 +603,7 @@ function validateOptimization(optimizedTex: string, keywordTargets: string[]): V
     experienceEntryCount,
     experienceBulletCount,
     projectBulletCount,
+    estimatedLineCount,
     keywordCoverage,
     keywordTargets,
     requiredCoverage,
@@ -310,12 +619,14 @@ function buildCorrectionMessage(validation: ValidationResult): string {
     "Keep LaTeX valid and keep the resume to one page.",
     `Current failures: ${validation.failures.join(", ")}`,
     "Required corrections:",
-    "- keep only the strongest 3-4 experience entries",
-    "- include 2-3 projects with strongest JD alignment, preferring 2 if space is tight",
-    "- ensure total bullet count is between 11 and 18",
+    "- keep only the strongest 2-3 experience entries",
+    "- include 2 projects with strongest JD alignment unless a 3rd clearly still fits on one page",
+    "- keep only the strongest 2-3 experience entries if needed for one page",
+    "- ensure total bullet count is between 11 and 16",
     "- keep project bullets to 6 or fewer total",
-    "- keep experience bullets to 12 or fewer total",
+    "- keep experience bullets to 10 or fewer total",
     "- compress bullets before adding detail",
+    `- reduce estimated rendered line count to ${MAX_ESTIMATED_LINES} or less`,
     `- ensure keyword coverage reaches at least ${validation.requiredCoverage}`,
     `- add truthful language covering missing terms where evidence exists: ${missing.join(", ") || "none"}`,
   ].join("\n");
@@ -554,7 +865,17 @@ export default async function handler(
     }
 
     let finalOutput = firstPass.payload;
-    let validation = validateOptimization(firstPass.payload.optimizedTex, supportKeywordTargets);
+    let compression = compressResumeToOnePage(firstPass.payload.optimizedTex, sourceJobDescription, supportKeywordTargets);
+    finalOutput = {
+      ...finalOutput,
+      optimizedTex: compression.tex,
+      removedProjects: [...new Set([...finalOutput.removedProjects, ...compression.removedProjects])],
+      includedProjects:
+        compression.includedProjects.length > 0
+          ? compression.includedProjects
+          : finalOutput.includedProjects,
+    };
+    let validation = validateOptimization(finalOutput.optimizedTex, supportKeywordTargets);
     let regenerationAttempted = false;
     let regenerationFailedMessage = "";
     let finalResponseId = firstPass.responseId;
@@ -577,8 +898,17 @@ export default async function handler(
         totalTokenUsage = addTokenUsage(totalTokenUsage, secondPass.usage);
 
         if (secondPass.payload.optimizedTex) {
-          finalOutput = secondPass.payload;
-          validation = validateOptimization(secondPass.payload.optimizedTex, supportKeywordTargets);
+          compression = compressResumeToOnePage(secondPass.payload.optimizedTex, sourceJobDescription, supportKeywordTargets);
+          finalOutput = {
+            ...secondPass.payload,
+            optimizedTex: compression.tex,
+            removedProjects: [...new Set([...secondPass.payload.removedProjects, ...compression.removedProjects])],
+            includedProjects:
+              compression.includedProjects.length > 0
+                ? compression.includedProjects
+                : secondPass.payload.includedProjects,
+          };
+          validation = validateOptimization(finalOutput.optimizedTex, supportKeywordTargets);
         }
       } catch (retryErr: any) {
         const retryDetails = summarizeError(retryErr);
@@ -609,6 +939,9 @@ export default async function handler(
         experience_entry_count: validation.experienceEntryCount,
         experience_bullet_count: validation.experienceBulletCount,
         project_bullet_count: validation.projectBulletCount,
+        estimated_line_count: validation.estimatedLineCount,
+        compressed_by_postprocessor: compression.compressed,
+        removed_experience_entries: compression.removedExperienceHeadings,
         regeneration_attempted: regenerationAttempted,
         validator_failures: validation.failures,
         optimizer: "openai",
