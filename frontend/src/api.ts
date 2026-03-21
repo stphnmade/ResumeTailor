@@ -6,8 +6,87 @@ export type GenerateTexResponse = {
   optimized_tex: string;
   metadata?: {
     removed_projects?: string[];
+    included_projects?: string[];
     keyword_focus?: string[];
+    keyword_coverage?: string[];
+    support_keywords_target?: string[];
+    coverage_required?: number;
+    coverage_total?: number;
+    project_count?: number;
+    bullet_count?: number;
+    experience_entry_count?: number;
+    experience_bullet_count?: number;
+    project_bullet_count?: number;
+    validator_failures?: string[];
+    regeneration_attempted?: boolean;
     warning?: string;
+    optimizer?: string;
+    model?: string;
+    key_source?: string;
+    openai_response_id?: string;
+    openai_tokens?: {
+      pass_1?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+      pass_2?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+      total?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+    };
+    openai_error?: {
+      name?: string;
+      message?: string;
+      status?: number;
+      code?: string;
+      type?: string;
+      cause?: string;
+    };
+  };
+};
+
+export type GenerateCoverLetterResponse = {
+  cover_letter_tex: string;
+  metadata?: {
+    skills_highlighted?: string[];
+    evidence_used?: string[];
+    tone?: string;
+    length?: string;
+    warning?: string;
+    optimizer?: string;
+    model?: string;
+    key_source?: string;
+    openai_response_id?: string;
+    openai_tokens?: {
+      total?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+        cached_input_tokens?: number;
+        reasoning_output_tokens?: number;
+      };
+    };
+    openai_error?: {
+      name?: string;
+      message?: string;
+      status?: number;
+      code?: string;
+      type?: string;
+      cause?: string;
+    };
   };
 };
 
@@ -19,7 +98,12 @@ export async function health() {
   return res.json();
 }
 
-export async function generateTex(resumeTex: string, jobDescription: string): Promise<GenerateTexResponse> {
+export async function generateTex(
+  resumeTex: string,
+  jobDescription: string,
+  contextNotes = '',
+  recruiterNotes = ''
+): Promise<GenerateTexResponse> {
   const res = await fetch(`${BACKEND_URL}/api/generate-tex`, {
     method: 'POST',
     headers: {
@@ -28,6 +112,8 @@ export async function generateTex(resumeTex: string, jobDescription: string): Pr
     body: JSON.stringify({
       resume_tex: resumeTex,
       job_description: jobDescription,
+      context_notes: contextNotes,
+      recruiter_notes: recruiterNotes,
     }),
   });
 
@@ -36,6 +122,42 @@ export async function generateTex(resumeTex: string, jobDescription: string): Pr
     throw new Error(String(data?.error || `Generate failed: ${res.status}`));
   }
   return data as GenerateTexResponse;
+}
+
+export async function generateCoverLetter(params: {
+  resumeTex: string;
+  jobDescription: string;
+  contextNotes?: string;
+  recruiterNotes?: string;
+  roleName?: string;
+  companyName?: string;
+  hiringManager?: string;
+  tone?: string;
+  length?: string;
+}): Promise<GenerateCoverLetterResponse> {
+  const res = await fetch(`${BACKEND_URL}/api/generate-cover-letter`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      resume_tex: params.resumeTex,
+      job_description: params.jobDescription,
+      context_notes: params.contextNotes || '',
+      recruiter_notes: params.recruiterNotes || '',
+      role_name: params.roleName || '',
+      company_name: params.companyName || '',
+      hiring_manager: params.hiringManager || '',
+      tone: params.tone || 'professional',
+      length: params.length || 'standard',
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Cover letter generation failed: ${res.status}`));
+  }
+  return data as GenerateCoverLetterResponse;
 }
 
 export async function compilePdf(tex: string): Promise<Blob> {
@@ -48,6 +170,12 @@ export async function compilePdf(tex: string): Promise<Blob> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(String(err?.log || `Compile failed: ${res.status}`));
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/pdf')) {
+    const asText = await res.text().catch(() => '');
+    throw new Error(asText || `Compile did not return PDF (${res.status}).`);
   }
 
   return await res.blob();

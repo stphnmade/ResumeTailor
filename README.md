@@ -10,9 +10,11 @@ This repository is split into:
 - `frontend/index.html`
 - `frontend/src/*`
 - `frontend/vite.config.js` (`base: '/ResumeTailor/'` for GitHub Pages)
+- `source_of_truth/*` (canonical resume + tailoring rules + JD examples)
 - `backend/api/health.ts`
-- `backend/api/generate-tex.js`
-- `backend/api/compile-pdf.js`
+- `backend/api/generate-tex.ts`
+- `backend/api/compile-pdf.ts`
+- `backend/lib/prompts/*.md` (prompt templates loaded at runtime)
 - `backend/vercel.json`
 - `.github/workflows/deploy-pages.yml`
 
@@ -30,8 +32,9 @@ A GitHub Actions workflow is included at `.github/workflows/deploy-pages.yml`.
 It:
 
 1. Installs `frontend/` dependencies
-2. Builds `frontend/dist`
-3. Deploys `frontend/dist` to GitHub Pages
+2. Copies repository `source_of_truth/` into `frontend/public/source_of_truth/`
+3. Builds `frontend/dist`
+4. Deploys `frontend/dist` to GitHub Pages
 
 Set repository variable `VITE_BACKEND_URL` to your deployed Vercel backend origin (for example `https://your-backend.vercel.app`).
 
@@ -45,10 +48,14 @@ After deployment, frontend URL should be:
 2. Set **Root Directory** to `backend`.
 3. Deploy.
 4. In Vercel Project Settings -> Environment Variables, set:
-   - `OPENAI_KEY`
-   - `OPENAI_MODEL` (optional, e.g. `gpt-4.1-mini`)
+   - `OPENAI_API_KEY`
+   - `OPENAI_MODEL` (optional, e.g. `gpt-5.2`)
+   - `LATEX_REMOTE_FALLBACK` (optional, defaults to enabled; set to `false` to disable remote PDF fallback when local `tectonic` is unavailable)
+   - `LATEXONLINE_BASE_URL` (optional, defaults to `https://texlive2020.latexonline.cc`)
 
 `backend/vercel.json` configures serverless function runtime settings.
+
+Note: remote fallback sends LaTeX source to the configured remote compiler endpoint.
 
 ## Verification Checklist
 
@@ -61,3 +68,6 @@ After deployment, frontend URL should be:
    - Trigger Generate flow and confirm API requests target `VITE_BACKEND_URL`
 4. Confirm no secret leakage:
    - Search frontend for OpenAI secret names (should be none)
+5. Canonical resume asset is reachable:
+   - `GET https://stphnmade.github.io/ResumeTailor/source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex`
+   - Expected status: `200`

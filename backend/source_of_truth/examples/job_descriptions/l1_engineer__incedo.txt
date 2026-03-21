@@ -1,0 +1,34 @@
+Description
+L1 Engineer
+Location: Florham Park, NJ & Bay Area, USA
+Workplace Type: Onsite
+
+About the Role
+Incedo is seeking proactive L1 Engineers to provide SOP-based support to our customers. This role is crucial for ensuring the smooth operation of our clients' systems and requires a strong customer-first mindset. As an L1 Engineer, you will be responsible for initial troubleshooting, incident management, and escalating complex issues to higher-level support teams. The ideal candidate will possess excellent communication skills, a keen attention to detail, and the ability to work collaboratively within a team environment. You will be working in a fast-paced environment, providing essential support to our clients and contributing to their overall success. This role offers an excellent opportunity to enhance your technical skills and gain valuable experience in a dynamic and growing company. We are looking for individuals who are passionate about technology and dedicated to providing exceptional customer service. If you are a problem-solver with a strong work ethic and a desire to learn, we encourage you to apply.
+
+Key Responsibilities
+Provide first-level technical support to customers via phone, email, and chat.
+Follow established Standard Operating Procedures (SOPs) to resolve common issues.
+Document all interactions and troubleshooting steps in a clear and concise manner.
+Escalate complex issues to L2/L3 support teams as needed.
+Monitor system performance and identify potential issues.
+Collaborate with team members to ensure timely resolution of incidents.
+Contribute to the improvement of SOPs and knowledge base articles.
+Maintain a high level of customer satisfaction through professional and courteous service.
+Participate in training sessions to enhance technical skills and knowledge.
+Adhere to company policies and procedures.
+
+Required Skills & Qualifications
+Strong and clear written and verbal communication skills.
+Customer-first mindset with a focus on providing excellent service.
+Empathy and strong stakeholder communication skills.
+Attention to detail and documentation discipline.
+Problem-solving and structured troubleshooting abilities.
+Ownership, urgency, and team collaboration skills.
+Ability to follow runbooks and improve them over time.
+Good understanding of collaboration tools like Microsoft Teams/Outlook/Webex.
+Basic understanding of networking concepts (TCP/IP, DNS, etc.).
+Familiarity with operating systems (Windows, Linux).
+Experience with ticketing systems (e.g., ServiceNow, Jira).
+Ability to work independently and as part of a team.
+Associate's or Bachelor's degree in a related field is a plus.

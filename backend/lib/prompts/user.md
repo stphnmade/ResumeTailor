@@ -1,0 +1,44 @@
+Apply the following authoritative rule documents:
+
+[Tailoring Rules]
+{{TAILORING_RULES}}
+
+[Allowed Claims]
+{{ALLOWED_CLAIMS}}
+
+[Forbidden Claims]
+{{FORBIDDEN_CLAIMS}}
+
+[Formatting Rules]
+{{FORMATTING_RULES}}
+
+[ATS Keywords Guidance]
+{{ATS_KEYWORDS_GUIDANCE}}
+
+[Canonical Source Resume]
+{{CANONICAL_RESUME}}
+
+[Sample Job Description Reference]
+{{REFERENCE_JOB_DESCRIPTION}}
+
+Now optimize the candidate resume for the target job description under those rules.
+
+Target Job Description:
+{{JOB_DESCRIPTION}}
+
+Candidate Resume LaTeX:
+{{RESUME_TEX}}
+
+Supplemental Context Notes:
+{{CONTEXT_NOTES}}
+
+Recruiter Instruction Notes:
+{{RECRUITER_NOTES}}
+
+Output requirements:
+- Prioritize ATS language alignment while preserving truth.
+- Keep the resume to one page; never choose comprehensiveness over page fit.
+- Follow recruiter instruction notes only when they are consistent with source truth and the one-page budget.
+- Explicitly include support keywords in bullets where supported by existing evidence.
+- Keep claims strictly truthful to source material.
+- Return only the required JSON object with metadata.
