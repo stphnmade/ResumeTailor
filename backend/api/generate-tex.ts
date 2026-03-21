@@ -51,6 +51,7 @@ type ResumeEntry = {
   bullets: ResumeBullet[];
   score: number;
   start: number;
+  end: number;
   pinned: boolean;
   isCurrent: boolean;
 };
@@ -359,10 +360,22 @@ function extractEntries(sectionBody: string, macroName: string): ResumeEntry[] {
       bullets: extractBullets(raw),
       score: 0,
       start,
+      end,
       pinned: false,
       isCurrent: /\bpresent\b/.test(headingText),
     };
   });
+}
+
+function rebuildSectionBodyWithEntries(sectionBody: string, entries: ResumeEntry[]): string {
+  if (!entries.length) return sectionBody;
+
+  const sorted = [...entries].sort((a, b) => a.start - b.start);
+  const prefix = sectionBody.slice(0, sorted[0].start);
+  const suffix = sectionBody.slice(sorted[sorted.length - 1].end);
+  const middle = sorted.map((entry) => entry.raw.trim()).join("\n\n");
+
+  return `${prefix}${middle}\n${suffix}`;
 }
 
 function scoreEntry(
@@ -507,15 +520,31 @@ function compressResumeToOnePage(
   let selectedExperience = selectEntries(experienceEntries, 3, jdTerms, supportKeywordTargets, "experience");
   let selectedProjects = selectEntries(projectEntries, 2, jdTerms, supportKeywordTargets, "projects");
 
-  let nextTex = replaceSectionBody(tex, "Experience", `\n${selectedExperience.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
-  nextTex = replaceSectionBody(nextTex, "Projects", `\n${selectedProjects.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+  let nextTex = replaceSectionBody(
+    tex,
+    "Experience",
+    rebuildSectionBodyWithEntries(experienceBody, selectedExperience)
+  );
+  nextTex = replaceSectionBody(
+    nextTex,
+    "Projects",
+    rebuildSectionBodyWithEntries(projectsBody, selectedProjects)
+  );
 
   let estimatedLineCount = estimateRenderedLines(nextTex);
 
   if (estimatedLineCount > MAX_ESTIMATED_LINES && selectedExperience.length > 2) {
     selectedExperience = selectEntries(experienceEntries, 2, jdTerms, supportKeywordTargets, "experience");
-    nextTex = replaceSectionBody(tex, "Experience", `\n${selectedExperience.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
-    nextTex = replaceSectionBody(nextTex, "Projects", `\n${selectedProjects.map((entry) => entry.raw.trim()).join("\n\n")}\n\n`);
+    nextTex = replaceSectionBody(
+      tex,
+      "Experience",
+      rebuildSectionBodyWithEntries(experienceBody, selectedExperience)
+    );
+    nextTex = replaceSectionBody(
+      nextTex,
+      "Projects",
+      rebuildSectionBodyWithEntries(projectsBody, selectedProjects)
+    );
     estimatedLineCount = estimateRenderedLines(nextTex);
   }
 
