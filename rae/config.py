@@ -44,4 +44,4 @@ def get_openai_api_key() -> str | None:
 
 
 def get_openai_model() -> str:
-    return os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    return os.getenv("OPENAI_MODEL", "gpt-5.2")

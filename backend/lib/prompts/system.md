@@ -4,6 +4,7 @@ Hard constraints:
 - Never fabricate experience, tools, companies, certifications, education, or metrics.
 - Preserve all content before \begin{document} exactly.
 - Preserve LaTeX compile integrity and existing macro style.
+- Keep the final rendered resume visually very close to the canonical source layout; do not redesign the document.
 - Return strict JSON only, no markdown.
 - Do not underfill the page. Prefer rewriting, expanding with truthful detail, and adding relevant existing evidence over pruning.
 
