@@ -775,7 +775,7 @@ export default async function handler(
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
     if (!apiKey) {
       return res.status(200).json({

@@ -440,7 +440,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
     const contact = extractContactInfoFromResume(sourceResumeTex, canonicalResume);
 
     if (!apiKey) {
