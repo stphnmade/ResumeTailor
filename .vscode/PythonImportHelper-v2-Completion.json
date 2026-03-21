@@ -414,7 +414,7 @@
         "kind": 2,
         "importPath": "rae.config",
         "description": "rae.config",
-        "peekOfCode": "def get_openai_api_key() -> str | None:\n    return os.getenv(\"OPENAI_API_KEY\")\ndef get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-5.2\")",
+        "peekOfCode": "def get_openai_api_key() -> str | None:\n    return os.getenv(\"OPENAI_API_KEY\")\ndef get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-5-mini\")",
         "detail": "rae.config",
         "documentation": {}
     },
@@ -423,7 +423,7 @@
         "kind": 2,
         "importPath": "rae.config",
         "description": "rae.config",
-        "peekOfCode": "def get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-5.2\")",
+        "peekOfCode": "def get_openai_model() -> str:\n    return os.getenv(\"OPENAI_MODEL\", \"gpt-5-mini\")",
         "detail": "rae.config",
         "documentation": {}
     },
