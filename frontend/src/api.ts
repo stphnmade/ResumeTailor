@@ -2,6 +2,10 @@ export const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '') ??
   'https://resumetailor-ivory.vercel.app';
 
+const GENERATE_TIMEOUT_MS = 70_000;
+const COVER_LETTER_TIMEOUT_MS = 60_000;
+const COMPILE_TIMEOUT_MS = 40_000;
+
 export type GenerateTexResponse = {
   optimized_tex: string;
   metadata?: {
@@ -93,8 +97,27 @@ export type GenerateCoverLetterResponse = {
   };
 };
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function health() {
-  const res = await fetch(`${BACKEND_URL}/api/health`, { method: 'GET' });
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/health`, { method: 'GET' }, 15_000);
   if (!res.ok) {
     throw new Error(`Health failed: ${res.status}`);
   }
@@ -107,7 +130,7 @@ export async function generateTex(
   contextNotes = '',
   recruiterNotes = ''
 ): Promise<GenerateTexResponse> {
-  const res = await fetch(`${BACKEND_URL}/api/generate-tex`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/generate-tex`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -118,7 +141,7 @@ export async function generateTex(
       context_notes: contextNotes,
       recruiter_notes: recruiterNotes,
     }),
-  });
+  }, GENERATE_TIMEOUT_MS);
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -138,7 +161,7 @@ export async function generateCoverLetter(params: {
   tone?: string;
   length?: string;
 }): Promise<GenerateCoverLetterResponse> {
-  const res = await fetch(`${BACKEND_URL}/api/generate-cover-letter`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/generate-cover-letter`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -154,7 +177,7 @@ export async function generateCoverLetter(params: {
       tone: params.tone || 'professional',
       length: params.length || 'standard',
     }),
-  });
+  }, COVER_LETTER_TIMEOUT_MS);
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -164,11 +187,11 @@ export async function generateCoverLetter(params: {
 }
 
 export async function compilePdf(tex: string): Promise<Blob> {
-  const res = await fetch(`${BACKEND_URL}/api/compile-pdf`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/compile-pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tex }),
-  });
+  }, COMPILE_TIMEOUT_MS);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

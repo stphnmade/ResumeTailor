@@ -4,6 +4,9 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
+const OPENAI_REQUEST_TIMEOUT_MS = 45_000;
+const OPENAI_MAX_RETRIES = 0;
+const RESUME_MAX_OUTPUT_TOKENS = 3_200;
 
 type ModelPayload = {
   optimizedTex: string;
@@ -71,6 +74,34 @@ type PromptContext = {
   values: Record<string, string>;
   canonicalResume: string;
 };
+
+const RESUME_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["optimized_tex", "metadata"],
+  properties: {
+    optimized_tex: { type: "string" },
+    metadata: {
+      type: "object",
+      additionalProperties: false,
+      required: ["keyword_focus", "removed_projects", "included_projects"],
+      properties: {
+        keyword_focus: {
+          type: "array",
+          items: { type: "string" },
+        },
+        removed_projects: {
+          type: "array",
+          items: { type: "string" },
+        },
+        included_projects: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
 
 type SupportKeyword = {
   term: string;
@@ -775,6 +806,15 @@ async function runOptimizationPass(
   const response = await client.responses.create({
     model,
     reasoning: { effort: "low" },
+    max_output_tokens: RESUME_MAX_OUTPUT_TOKENS,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "resume_tailor_output",
+        strict: true,
+        schema: RESUME_OUTPUT_SCHEMA,
+      },
+    },
     input: [
       {
         role: "system",
@@ -785,6 +825,9 @@ async function runOptimizationPass(
         content: [{ type: "input_text", text: effectiveUserPrompt }],
       },
     ],
+  }, {
+    timeout: OPENAI_REQUEST_TIMEOUT_MS,
+    maxRetries: OPENAI_MAX_RETRIES,
   });
 
   const parsed = extractJson(response.output_text || "");
@@ -844,26 +887,16 @@ export default async function handler(
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5";
+    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
 
     if (!apiKey) {
-      return res.status(200).json({
-        optimized_tex: sourceResumeTex,
+      return res.status(500).json({
+        error: "Missing OPENAI_API_KEY",
         metadata: {
-          keyword_focus: [],
-          keyword_coverage: [],
-          support_keywords_target: supportKeywordTargets,
-          coverage_required: Math.min(8, supportKeywordTargets.length),
-          coverage_total: 0,
-          removed_projects: [],
-          included_projects: [],
-          experience_entry_count: 0,
-          experience_bullet_count: 0,
-          project_bullet_count: 0,
-          optimizer: "fallback",
+          optimizer: "error",
           model: "none",
-          warning: "OPENAI_UNAVAILABLE_FALLBACK",
           key_source: keySource,
+          warning: "OPENAI_UNAVAILABLE",
           openai_tokens: {
             pass_1: zeroTokenUsage(),
             total: zeroTokenUsage(),
@@ -872,30 +905,24 @@ export default async function handler(
       });
     }
 
-    const client = new OpenAI({ apiKey });
+    const client = new OpenAI({
+      apiKey,
+      timeout: OPENAI_REQUEST_TIMEOUT_MS,
+      maxRetries: OPENAI_MAX_RETRIES,
+    });
 
     let firstPass: OptimizationPassResult;
     try {
       firstPass = await runOptimizationPass(client, model, promptContext.systemPrompt, renderedUserPrompt);
     } catch (openaiErr: any) {
       const details = summarizeError(openaiErr);
-      return res.status(200).json({
-        optimized_tex: sourceResumeTex,
+      return res.status(502).json({
+        error: `OpenAI request failed: ${details.name}: ${details.message}`,
         metadata: {
-          keyword_focus: [],
-          keyword_coverage: [],
-          support_keywords_target: supportKeywordTargets,
-          coverage_required: Math.min(8, supportKeywordTargets.length),
-          coverage_total: 0,
-          removed_projects: [],
-          included_projects: [],
-          experience_entry_count: 0,
-          experience_bullet_count: 0,
-          project_bullet_count: 0,
-          optimizer: "fallback",
+          optimizer: "error",
           model,
-          warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
           key_source: keySource,
+          warning: "OPENAI_CONNECTION_ERROR",
           openai_error: details,
           openai_tokens: {
             pass_1: zeroTokenUsage(),
@@ -906,23 +933,13 @@ export default async function handler(
     }
 
     if (!firstPass.payload.optimizedTex) {
-      return res.status(200).json({
-        optimized_tex: sourceResumeTex,
+      return res.status(502).json({
+        error: "Model returned invalid output: EMPTY_OPTIMIZED_TEX",
         metadata: {
-          keyword_focus: [],
-          keyword_coverage: [],
-          support_keywords_target: supportKeywordTargets,
-          coverage_required: Math.min(8, supportKeywordTargets.length),
-          coverage_total: 0,
-          removed_projects: [],
-          included_projects: [],
-          experience_entry_count: 0,
-          experience_bullet_count: 0,
-          project_bullet_count: 0,
-          optimizer: "fallback",
+          optimizer: "error",
           model,
-          warning: "OPENAI_INVALID_OUTPUT_FALLBACK: EMPTY_OPTIMIZED_TEX",
           key_source: keySource,
+          warning: "OPENAI_INVALID_OUTPUT",
           openai_response_id: firstPass.responseId,
           openai_tokens: {
             pass_1: firstPass.usage,

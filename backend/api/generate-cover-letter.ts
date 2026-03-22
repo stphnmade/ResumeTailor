@@ -4,6 +4,9 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
+const OPENAI_REQUEST_TIMEOUT_MS = 45_000;
+const OPENAI_MAX_RETRIES = 0;
+const COVER_LETTER_MAX_OUTPUT_TOKENS = 1_800;
 
 type TokenUsage = {
   input_tokens: number;
@@ -27,6 +30,27 @@ type ContactInfo = {
   email: string;
   phone: string;
 };
+
+const COVER_LETTER_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["body_paragraphs", "closing_sentence", "skills_highlighted", "evidence_used"],
+  properties: {
+    body_paragraphs: {
+      type: "array",
+      items: { type: "string" },
+    },
+    closing_sentence: { type: "string" },
+    skills_highlighted: {
+      type: "array",
+      items: { type: "string" },
+    },
+    evidence_used: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+} as const;
 
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
@@ -352,6 +376,15 @@ async function runLetterPass(
   const response = await client.responses.create({
     model,
     reasoning: { effort: "low" },
+    max_output_tokens: COVER_LETTER_MAX_OUTPUT_TOKENS,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "cover_letter_output",
+        strict: true,
+        schema: COVER_LETTER_OUTPUT_SCHEMA,
+      },
+    },
     input: [
       {
         role: "system",
@@ -362,6 +395,9 @@ async function runLetterPass(
         content: [{ type: "input_text", text: userPrompt }],
       },
     ],
+  }, {
+    timeout: OPENAI_REQUEST_TIMEOUT_MS,
+    maxRetries: OPENAI_MAX_RETRIES,
   });
 
   const parsed = extractJson(response.output_text || "");
@@ -441,28 +477,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5";
+    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
     const contact = extractContactInfoFromResume(sourceResumeTex, canonicalResume);
 
     if (!apiKey) {
-      const fallbackPayload = buildFallbackPayload(resolvedRoleName, resolvedCompanyName, resolvedTone);
-      return res.status(200).json({
-        cover_letter_tex: buildCoverLetterTex(
-          texTemplate,
-          contact,
-          fallbackPayload,
-          resolvedCompanyName,
-          resolvedHiringManager
-        ),
+      return res.status(500).json({
+        error: "Missing OPENAI_API_KEY",
         metadata: {
-          skills_highlighted: fallbackPayload.skillsHighlighted,
-          evidence_used: fallbackPayload.evidenceUsed,
-          tone: resolvedTone,
-          length: resolvedLength,
-          optimizer: "fallback",
+          optimizer: "error",
           model: "none",
-          warning: "OPENAI_UNAVAILABLE_FALLBACK",
           key_source: keySource,
+          warning: "OPENAI_UNAVAILABLE",
           openai_tokens: {
             total: zeroTokenUsage(),
           },
@@ -470,7 +495,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const client = new OpenAI({ apiKey });
+    const client = new OpenAI({
+      apiKey,
+      timeout: OPENAI_REQUEST_TIMEOUT_MS,
+      maxRetries: OPENAI_MAX_RETRIES,
+    });
 
     try {
       const result = await runLetterPass(client, model, systemPrompt, renderedUserPrompt);
@@ -503,23 +532,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     } catch (openaiErr: any) {
       const details = summarizeError(openaiErr);
-      const fallbackPayload = buildFallbackPayload(resolvedRoleName, resolvedCompanyName, resolvedTone);
-      return res.status(200).json({
-        cover_letter_tex: buildCoverLetterTex(
-          texTemplate,
-          contact,
-          fallbackPayload,
-          resolvedCompanyName,
-          resolvedHiringManager
-        ),
+      return res.status(502).json({
+        error: `OpenAI request failed: ${details.name}: ${details.message}`,
         metadata: {
-          skills_highlighted: fallbackPayload.skillsHighlighted,
-          evidence_used: fallbackPayload.evidenceUsed,
           tone: resolvedTone,
           length: resolvedLength,
-          optimizer: "fallback",
+          optimizer: "error",
           model,
-          warning: `OPENAI_CONNECTION_ERROR_FALLBACK: ${details.name}: ${details.message}`,
+          warning: "OPENAI_CONNECTION_ERROR",
           key_source: keySource,
           openai_error: details,
           openai_tokens: {
