@@ -792,6 +792,10 @@ function buildPromptContext(
   });
 }
 
+function buildReasoningConfig(model: string) {
+  return /^gpt-5(\b|-)/.test(model) ? { effort: "low" as const } : undefined;
+}
+
 async function runOptimizationPass(
   client: OpenAI,
   model: string,
@@ -805,7 +809,7 @@ async function runOptimizationPass(
 
   const response = await client.responses.create({
     model,
-    reasoning: { effort: "low" },
+    ...(buildReasoningConfig(model) ? { reasoning: buildReasoningConfig(model) } : {}),
     max_output_tokens: RESUME_MAX_OUTPUT_TOKENS,
     text: {
       format: {
@@ -887,7 +891,7 @@ export default async function handler(
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
     if (!apiKey) {
       return res.status(500).json({

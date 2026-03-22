@@ -367,6 +367,10 @@ function buildCoverLetterTex(
   });
 }
 
+function buildReasoningConfig(model: string) {
+  return /^gpt-5(\b|-)/.test(model) ? { effort: "low" as const } : undefined;
+}
+
 async function runLetterPass(
   client: OpenAI,
   model: string,
@@ -375,7 +379,7 @@ async function runLetterPass(
 ): Promise<{ payload: LetterPayload; usage: TokenUsage; responseId?: string }> {
   const response = await client.responses.create({
     model,
-    reasoning: { effort: "low" },
+    ...(buildReasoningConfig(model) ? { reasoning: buildReasoningConfig(model) } : {}),
     max_output_tokens: COVER_LETTER_MAX_OUTPUT_TOKENS,
     text: {
       format: {
@@ -477,7 +481,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-5-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
     const contact = extractContactInfoFromResume(sourceResumeTex, canonicalResume);
 
     if (!apiKey) {
