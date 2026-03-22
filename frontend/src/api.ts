@@ -24,8 +24,12 @@ export type GenerateTexResponse = {
     estimated_line_count?: number;
     compressed_by_postprocessor?: boolean;
     removed_experience_entries?: string[];
+    included_experience_entries?: string[];
     validator_failures?: string[];
     regeneration_attempted?: boolean;
+    source_kind?: string;
+    relevance_summary?: string;
+    chronology_summary?: string;
     warning?: string;
     optimizer?: string;
     model?: string;

@@ -20,6 +20,13 @@ Required optimization method (follow in order):
    - keep only the strongest 2-3 experience entries
    - compress or remove lower-value bullets before adding new detail
    - prefer concise bullets over long narrative bullets
+6) Preserve reverse-chronological ordering:
+   - keep selected experience entries ordered from most recent to oldest based on the source
+   - keep project ordering chronological unless recruiter notes explicitly prefer relevance-first and it still reads naturally
+7) If the resume input is plain text rather than LaTeX:
+   - treat the plain-text input as source evidence only
+   - synthesize a compile-safe LaTeX resume using the canonical layout guidance
+   - do not invent missing dates, employers, or tools; omit unsupported fields instead
 
 Output JSON schema:
 {
@@ -27,6 +34,8 @@ Output JSON schema:
   "metadata": {
     "removed_projects": ["string"],
     "keyword_focus": ["string"],
-    "included_projects": ["string"]
+    "included_projects": ["string"],
+    "relevance_summary": "string",
+    "chronology_summary": "string"
   }
 }

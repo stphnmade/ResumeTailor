@@ -13,6 +13,8 @@ type ModelPayload = {
   keywordFocus: string[];
   removedProjects: string[];
   includedProjects: string[];
+  relevanceSummary: string;
+  chronologySummary: string;
 };
 
 type TokenUsage = {
@@ -63,6 +65,7 @@ type CompressionResult = {
   tex: string;
   removedProjects: string[];
   includedProjects: string[];
+  includedExperienceHeadings: string[];
   removedExperienceHeadings: string[];
   estimatedLineCount: number;
   compressed: boolean;
@@ -98,6 +101,8 @@ const RESUME_OUTPUT_SCHEMA = {
           type: "array",
           items: { type: "string" },
         },
+        relevance_summary: { type: "string" },
+        chronology_summary: { type: "string" },
       },
     },
   },
@@ -261,6 +266,53 @@ function sanitizeGeneratedTex(tex: string): string {
   return String(tex || "")
     .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
     .trim();
+}
+
+function isLatexResumeSource(input: string): boolean {
+  const text = String(input || "").trim();
+  return text.includes("\\documentclass") || text.includes("\\begin{document}") || text.includes("\\section{");
+}
+
+function buildPlainTextResumeSeed(sourceText: string, canonicalResume: string): string {
+  const headingMatch = canonicalResume.match(/^[\s\S]*?\\begin\{document\}/);
+  const preamble = headingMatch ? headingMatch[0] : "";
+  const safeText = sourceText
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/&/g, "\\&")
+    .replace(/%/g, "\\%")
+    .replace(/\$/g, "\\$")
+    .replace(/#/g, "\\#")
+    .replace(/_/g, "\\_")
+    .replace(/{/g, "\\{")
+    .replace(/}/g, "\\}")
+    .replace(/\^/g, "\\textasciicircum{}")
+    .replace(/~/g, "\\textasciitilde{}");
+
+  return `${preamble}
+
+\\begin{center}
+  \\textbf{\\Huge \\scshape Candidate} \\\\ \\vspace{1pt}
+  \\small Plain-text source provided; tailor into canonical layout from verified evidence only.
+\\end{center}
+
+\\section{Experience}
+\\resumeSubHeadingListStart
+\\resumeSubHeadingListEnd
+
+\\section{Projects}
+\\resumeSubHeadingListStart
+\\resumeSubHeadingListEnd
+
+\\section{Technical Skills}
+\\begin{itemize}[leftmargin=0.15in, label={}]
+  \\small \\item {Source evidence available in prompt notes.}
+\\end{itemize}
+
+% SOURCE_EVIDENCE_START
+% ${safeText.replace(/\r?\n/g, "\n% ")}
+% SOURCE_EVIDENCE_END
+
+\\end{document}`;
 }
 
 function normalizeText(input: string): string {
@@ -537,6 +589,7 @@ function compressResumeToOnePage(
       tex,
       removedProjects: [],
       includedProjects: [],
+      includedExperienceHeadings: [],
       removedExperienceHeadings: [],
       estimatedLineCount: estimateRenderedLines(tex),
       compressed: false,
@@ -551,6 +604,7 @@ function compressResumeToOnePage(
       tex,
       removedProjects: [],
       includedProjects: [],
+      includedExperienceHeadings: [],
       removedExperienceHeadings: [],
       estimatedLineCount: estimateRenderedLines(tex),
       compressed: false,
@@ -589,6 +643,9 @@ function compressResumeToOnePage(
   }
 
   const includedProjects = selectedProjects.map((entry) => entry.headingText.slice(0, 120)).filter(Boolean);
+  const includedExperienceHeadings = selectedExperience
+    .map((entry) => entry.headingText.slice(0, 120))
+    .filter(Boolean);
   const removedProjects = projectEntries
     .filter((entry) => !selectedProjects.some((candidate) => candidate.start === entry.start))
     .map((entry) => entry.headingText.slice(0, 120))
@@ -602,6 +659,7 @@ function compressResumeToOnePage(
     tex: nextTex,
     removedProjects,
     includedProjects,
+    includedExperienceHeadings,
     removedExperienceHeadings,
     estimatedLineCount,
     compressed:
@@ -753,12 +811,16 @@ function parseModelPayload(parsed: any): ModelPayload {
   const includedProjects = Array.isArray(parsed?.metadata?.included_projects)
     ? parsed.metadata.included_projects.map((x: any) => String(x))
     : [];
+  const relevanceSummary = String(parsed?.metadata?.relevance_summary || "").trim();
+  const chronologySummary = String(parsed?.metadata?.chronology_summary || "").trim();
 
   return {
     optimizedTex,
     keywordFocus,
     removedProjects,
     includedProjects,
+    relevanceSummary,
+    chronologySummary,
   };
 }
 
@@ -788,10 +850,18 @@ function buildPromptContext(
   contextNotes: string,
   recruiterNotes: string
 ): string {
+  const inputIsLatex = isLatexResumeSource(sourceResumeTex);
+  const primaryResumeInput = inputIsLatex
+    ? sourceResumeTex
+    : buildPlainTextResumeSeed(sourceResumeTex, promptContext.canonicalResume);
+  const resumeSourceText = inputIsLatex ? "None provided." : sourceResumeTex;
+
   return renderTemplate(promptContext.userPrompt, {
     ...promptContext.values,
     CANONICAL_RESUME: buildCanonicalLayoutGuidance(sourceResumeTex, promptContext.canonicalResume),
-    RESUME_TEX: sourceResumeTex,
+    RESUME_SOURCE_KIND: inputIsLatex ? "latex" : "plain_text",
+    RESUME_TEX: primaryResumeInput,
+    RESUME_SOURCE_TEXT: resumeSourceText,
     JOB_DESCRIPTION: sourceJobDescription,
     CONTEXT_NOTES: contextNotes,
     RECRUITER_NOTES: recruiterNotes,
@@ -800,6 +870,25 @@ function buildPromptContext(
 
 function buildReasoningConfig(model: string) {
   return /^gpt-5(\b|-)/.test(model) ? { effort: "low" as const } : undefined;
+}
+
+function defaultRelevanceSummary(
+  includedExperienceHeadings: string[],
+  includedProjects: string[],
+  keywordCoverage: string[]
+): string {
+  const experienceLead = includedExperienceHeadings[0] || "the strongest recent experience";
+  const projectLead = includedProjects[0] || "the strongest supporting project";
+  const keywordLead = keywordCoverage.slice(0, 3).join(", ");
+  return `Selected ${experienceLead} and ${projectLead} first because they align most directly with the target role${keywordLead ? ` and cover keywords such as ${keywordLead}` : ""}.`;
+}
+
+function defaultChronologySummary(includedExperienceHeadings: string[]): string {
+  if (!includedExperienceHeadings.length) {
+    return "Chronology could not be summarized because no experience entries were preserved.";
+  }
+
+  return `Experience remains in reverse-chronological order, leading with ${includedExperienceHeadings[0]}.`;
 }
 
 async function runOptimizationPass(
@@ -990,6 +1079,7 @@ export default async function handler(
         coverage_total: validation.keywordCoverage.length,
         removed_projects: finalOutput.removedProjects,
         included_projects: finalOutput.includedProjects,
+        included_experience_entries: compression.includedExperienceHeadings,
         project_count: validation.projectCount,
         bullet_count: validation.bulletCount,
         experience_entry_count: validation.experienceEntryCount,
@@ -998,6 +1088,17 @@ export default async function handler(
         estimated_line_count: validation.estimatedLineCount,
         compressed_by_postprocessor: compression.compressed,
         removed_experience_entries: compression.removedExperienceHeadings,
+        source_kind: isLatexResumeSource(sourceResumeTex) ? "latex" : "plain_text",
+        relevance_summary:
+          finalOutput.relevanceSummary ||
+          defaultRelevanceSummary(
+            compression.includedExperienceHeadings,
+            finalOutput.includedProjects,
+            validation.keywordCoverage
+          ),
+        chronology_summary:
+          finalOutput.chronologySummary ||
+          defaultChronologySummary(compression.includedExperienceHeadings),
         regeneration_attempted: regenerationAttempted,
         validator_failures: validation.failures,
         optimizer: "openai",

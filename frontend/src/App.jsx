@@ -71,6 +71,9 @@ function cleanDetectedEntity(value, kind) {
 }
 
 function extractCandidateNameFromTex(tex) {
+  const plainText = String(tex || '').trim();
+  if (!plainText) return 'candidate';
+
   const headerMatch = tex.match(/\{\\Huge\s+\\scshape\s+([^}]*)\}/);
   if (headerMatch?.[1]) {
     const cleaned = headerMatch[1].replace(/\\[a-zA-Z]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -80,7 +83,15 @@ function extractCandidateNameFromTex(tex) {
   const commentName = tex.match(/^%\s*([A-Za-z][A-Za-z .'-]{2,})$/m);
   if (commentName?.[1]) return commentName[1].trim();
 
+  const plainTextName = plainText.match(/(?:^|\n)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z'.-]+){1,3})\s*(?:\n|$)/);
+  if (plainTextName?.[1]) return plainTextName[1].trim();
+
   return 'candidate';
+}
+
+function isLatexResumeSource(text) {
+  const value = String(text || '').trim();
+  return value.includes('\\documentclass') || value.includes('\\begin{document}') || value.includes('\\section{');
 }
 
 function extractRoleCompanyFromJD(jd) {
@@ -95,6 +106,20 @@ function extractRoleCompanyFromJD(jd) {
   for (let index = 0; index < Math.min(topLines.length, 6); index += 1) {
     const line = topLines[index];
     const nextLine = topLines[index + 1] || '';
+
+    const joinAsMatch = line.match(/^(.*?)\s+(?:is hiring for|is seeking|seeks|hiring for|hiring)\s+(?:an?\s+)?(.+)$/i);
+    if (joinAsMatch?.[1] && joinAsMatch?.[2]) {
+      const company = cleanDetectedEntity(joinAsMatch[1], 'company');
+      const role = cleanDetectedEntity(joinAsMatch[2], 'role');
+      if (role || company) return { role, company };
+    }
+
+    const roleAtCompanyMatch = line.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i);
+    if (roleAtCompanyMatch?.[1] && roleAtCompanyMatch?.[2]) {
+      const role = cleanDetectedEntity(roleAtCompanyMatch[1], 'role');
+      const company = cleanDetectedEntity(roleAtCompanyMatch[2], 'company');
+      if ((looksLikeRoleLine(role) || role) && company) return { role, company };
+    }
 
     if (looksLikeRoleLine(line) && nextLine && !looksLikeRoleLine(nextLine)) {
       const role = cleanDetectedEntity(line, 'role');
@@ -121,9 +146,11 @@ function extractRoleCompanyFromJD(jd) {
   let company = '';
   const companyPatterns = [
     /\b(?:company|organization|employer)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
+    /\b(?:about us|about the company)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
     /\bHere at\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})[,.\s]/i,
     /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+hiring\b/i,
     /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+seeking\b/i,
+    /\bJoin\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+as\b/i,
     /\bAbout\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
   ];
   for (const pattern of companyPatterns) {
@@ -142,6 +169,7 @@ function extractRoleCompanyFromJD(jd) {
   let role = '';
   const rolePatterns = [
     /\b(?:job title|title|role|position)\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+    /\bJoin\s+[A-Z][A-Za-z0-9&.'\- ]{1,60}\s+as\s+(?:an?\s+)?([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
     /\b(?:hiring|seeking)\s+an?\s+([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=\s+to\b|[.,\n]|$)/i,
     /\bRole\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
     /\bPosition\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
@@ -333,8 +361,8 @@ export default function App() {
     const file = evt.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.tex')) {
-      setError('Please upload a .tex file.');
+    if (!/\.(tex|txt)$/i.test(file.name)) {
+      setError('Please upload a .tex or .txt file.');
       return;
     }
 
@@ -393,9 +421,13 @@ export default function App() {
     const trimmedResume = resumeDraft.trim();
     const trimmedJD = jobDraft.trim();
 
-    if (!trimmedResume) return 'Resume LaTeX is required.';
-    if (!trimmedResume.includes('\\begin{document}')) return 'Resume must include \\begin{document}.';
-    if (!trimmedResume.includes('\\end{document}')) return 'Resume must include \\end{document}.';
+    if (!trimmedResume) return 'Resume source is required.';
+    if (isLatexResumeSource(trimmedResume)) {
+      if (!trimmedResume.includes('\\begin{document}')) return 'Resume must include \\begin{document}.';
+      if (!trimmedResume.includes('\\end{document}')) return 'Resume must include \\end{document}.';
+    } else if (trimmedResume.length < 80) {
+      return 'Plain-text resume input is too short. Add more source detail.';
+    }
 
     const bytes = new TextEncoder().encode(trimmedResume).length;
     if (bytes > MAX_RESUME_BYTES) return `Resume exceeds ${MAX_RESUME_BYTES} bytes.`;
@@ -411,7 +443,6 @@ export default function App() {
     const trimmedJD = jobDraft.trim();
 
     if (!trimmedResume) return 'A resume source is required to generate a cover letter.';
-    if (!trimmedResume.includes('\\begin{document}')) return 'Cover letter generation currently expects a LaTeX resume source.';
     if (!trimmedJD) return 'Job description is required.';
     if (trimmedJD.length > MAX_JD_CHARS) return `Job description exceeds ${MAX_JD_CHARS} characters.`;
 
@@ -770,6 +801,14 @@ export default function App() {
           <span>Applied inputs: <strong>{appliedAt || 'not yet'}</strong></span>
         </div>
 
+        {metadata?.relevance_summary || metadata?.chronology_summary ? (
+          <div className="hint">
+            {metadata?.relevance_summary ? `Relevance: ${metadata.relevance_summary}` : ''}
+            {metadata?.relevance_summary && metadata?.chronology_summary ? ' ' : ''}
+            {metadata?.chronology_summary ? `Chronology: ${metadata.chronology_summary}` : ''}
+          </div>
+        ) : null}
+
         <div className="filename-grid">
           <label className="filename-field">
             Candidate (auto)
@@ -804,6 +843,9 @@ export default function App() {
           </button>
           <div className="filename-preview">
             Download name: <code>{`${activeBaseName}.pdf`}</code>
+          </div>
+          <div className="hint">
+            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>
           </div>
         </div>
       </>
@@ -910,6 +952,9 @@ export default function App() {
             Download name: <code>{`${activeCoverLetterBaseName}.pdf`}</code>
           </div>
           <div className="hint">
+            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>
+          </div>
+          <div className="hint">
             Plus stays `.tex`-first, but you can try a PDF preview when compilation is available.
           </div>
         </div>
@@ -956,17 +1001,17 @@ export default function App() {
                 {isLoadingCanonical ? 'Loading...' : 'Reload canonical'}
               </button>
             ) : null}
-            <input type="file" accept=".tex" onChange={onUploadFile} disabled={useCanonical} />
+            <input type="file" accept=".tex,.txt" onChange={onUploadFile} disabled={useCanonical} />
           </div>
 
           <div className="drawer-grid drawer-grid-wide">
             <div>
-              <label>Resume source (.tex)</label>
+              <label>Resume source (.tex or plain text)</label>
               <textarea
                 rows={11}
                 value={resumeDraft}
                 onChange={(e) => setResumeDraft(e.target.value)}
-                placeholder="Paste source resume TeX"
+                placeholder="Paste source resume TeX or plain-text resume notes"
               />
             </div>
             <div>
@@ -998,7 +1043,7 @@ export default function App() {
             </div>
           </div>
           <div className="hint">
-            Shared inputs feed both tabs. Factual notes add source context. Recruiter notes act as additive prompt instructions and cannot override truth or one-page constraints.
+            Shared inputs feed both tabs. Resume source may be LaTeX or plain text. Factual notes add source context. Recruiter notes act as additive prompt instructions and cannot override truth or one-page constraints.
           </div>
         </section>
       ) : null}

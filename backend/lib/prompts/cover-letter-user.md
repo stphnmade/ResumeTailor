@@ -23,7 +23,7 @@ Requested length: {{LENGTH}}
 Target Job Description:
 {{JOB_DESCRIPTION}}
 
-Candidate Resume LaTeX:
+Candidate Resume Source:
 {{RESUME_TEX}}
 
 Supplemental Context Notes:

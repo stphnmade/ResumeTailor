@@ -275,31 +275,138 @@ function cleanDetectionLine(value: string): string {
     .trim();
 }
 
+function cleanJobText(value: string): string {
+  return String(value || "")
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLikelyNoiseLine(line: string): boolean {
+  return !line || /^(job description|about (the )?role|responsibilities|requirements|qualifications|preferred|benefits|location|salary|hours|schedule)$/i.test(line);
+}
+
+function looksLikeRoleLine(line: string): boolean {
+  return /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant|designer|architect|scientist|coordinator|technician|associate|lead|director|recruiter|writer|editor|intern)\b/i.test(
+    line
+  );
+}
+
+function looksLikeCompanyLine(line: string): boolean {
+  return /\b(inc|llc|ltd|corp|company|technologies|technology|systems|solutions|labs|group|partners|university|health|bank|services|studio|media)\b/i.test(
+    line
+  );
+}
+
+function cleanDetectedEntity(value: string, kind: "role" | "company"): string {
+  const cleaned = cleanDetectionLine(value)
+    .replace(/\b(remote|hybrid|onsite)\b/gi, "")
+    .replace(/\s+\|\s+.*/g, "")
+    .replace(/\s+-\s+(remote|hybrid|onsite).*$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!cleaned || isLikelyNoiseLine(cleaned)) return "";
+  if (kind === "role" && cleaned.length > 90) return "";
+  if (kind === "company" && cleaned.length > 70) return "";
+  return cleaned;
+}
+
 function detectRoleCompany(jobDescription: string) {
+  const jdText = cleanJobText(jobDescription);
   const lines = String(jobDescription || "")
     .split(/\r?\n/)
     .map((line) => cleanDetectionLine(line))
-    .filter(Boolean);
+    .filter((line) => line && !isLikelyNoiseLine(line));
 
   const topLines = lines.slice(0, 12);
-  let role = "";
-  let company = "";
+  for (let index = 0; index < Math.min(topLines.length, 6); index += 1) {
+    const line = topLines[index];
+    const nextLine = topLines[index + 1] || "";
 
-  for (const line of topLines) {
-    if (!role) {
-      const roleMatch = line.match(/\b(?:job title|title|role|position)\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,]|$)/i);
-      if (roleMatch?.[1]) role = cleanDetectionLine(roleMatch[1]);
+    const joinAsMatch = line.match(/^(.*?)\s+(?:is hiring for|is seeking|seeks|hiring for|hiring)\s+(?:an?\s+)?(.+)$/i);
+    if (joinAsMatch?.[1] && joinAsMatch?.[2]) {
+      const company = cleanDetectedEntity(joinAsMatch[1], "company");
+      const role = cleanDetectedEntity(joinAsMatch[2], "role");
+      if (role || company) return { role, company };
     }
-    if (!company) {
-      const companyMatch = line.match(/\b(?:company|organization|employer)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i);
-      if (companyMatch?.[1]) company = cleanDetectionLine(companyMatch[1]);
+
+    const roleAtCompanyMatch = line.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i);
+    if (roleAtCompanyMatch?.[1] && roleAtCompanyMatch?.[2]) {
+      const role = cleanDetectedEntity(roleAtCompanyMatch[1], "role");
+      const company = cleanDetectedEntity(roleAtCompanyMatch[2], "company");
+      if ((looksLikeRoleLine(role) || role) && company) return { role, company };
     }
-    if (!role && /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant|designer|architect|scientist)\b/i.test(line)) {
-      role = line;
+
+    if (looksLikeRoleLine(line) && nextLine && !looksLikeRoleLine(nextLine)) {
+      const role = cleanDetectedEntity(line, "role");
+      const company = cleanDetectedEntity(nextLine, "company");
+      if (role || company) return { role, company };
     }
-    if (!company && /\b(inc|llc|ltd|corp|company|technologies|technology|systems|solutions|labs|group|partners|university|health|bank|services|studio|media)\b/i.test(line)) {
-      company = line;
+
+    if (looksLikeCompanyLine(line) && nextLine && looksLikeRoleLine(nextLine)) {
+      const company = cleanDetectedEntity(line, "company");
+      const role = cleanDetectedEntity(nextLine, "role");
+      if (role || company) return { role, company };
     }
+
+    const splitMatch = line.match(/^(.+?)\s+(?:@|at|-)\s+(.+)$/i);
+    if (splitMatch?.[1] && splitMatch?.[2]) {
+      const left = cleanDetectedEntity(splitMatch[1], "role");
+      const right = cleanDetectedEntity(splitMatch[2], "company");
+      if (looksLikeRoleLine(left) || looksLikeCompanyLine(right)) {
+        return { role: left, company: right };
+      }
+    }
+  }
+
+  let company = "";
+  const companyPatterns = [
+    /\b(?:company|organization|employer)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
+    /\b(?:about us|about the company)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
+    /\bHere at\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})[,.\s]/i,
+    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+hiring\b/i,
+    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+seeking\b/i,
+    /\bJoin\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+as\b/i,
+    /\bAbout\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
+  ];
+  for (const pattern of companyPatterns) {
+    const match = jdText.match(pattern);
+    if (match?.[1]) {
+      company = cleanDetectedEntity(match[1], "company");
+      break;
+    }
+  }
+
+  if (!company) {
+    const titleCaseLine = topLines.find((line) => /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) && !looksLikeRoleLine(line));
+    if (titleCaseLine) company = cleanDetectedEntity(titleCaseLine, "company");
+  }
+
+  let role = "";
+  const rolePatterns = [
+    /\b(?:job title|title|role|position)\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+    /\bJoin\s+[A-Z][A-Za-z0-9&.'\- ]{1,60}\s+as\s+(?:an?\s+)?([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+    /\b(?:hiring|seeking)\s+an?\s+([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=\s+to\b|[.,\n]|$)/i,
+    /\bRole\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+    /\bPosition\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
+  ];
+  for (const pattern of rolePatterns) {
+    const match = jdText.match(pattern);
+    if (match?.[1]) {
+      role = cleanDetectedEntity(match[1], "role");
+      break;
+    }
+  }
+
+  if (!role) {
+    const roleLine = topLines.find(
+      (line) =>
+        /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(line) &&
+        !looksLikeCompanyLine(line)
+    );
+    if (roleLine) role = cleanDetectedEntity(roleLine, "role");
   }
 
   return { role, company };

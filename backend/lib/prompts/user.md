@@ -23,8 +23,14 @@ Now optimize the candidate resume for the target job description under those rul
 Target Job Description:
 {{JOB_DESCRIPTION}}
 
-Candidate Resume LaTeX:
+Candidate Resume Source Type:
+{{RESUME_SOURCE_KIND}}
+
+Primary Resume Input:
 {{RESUME_TEX}}
+
+Plain-Text Resume Evidence:
+{{RESUME_SOURCE_TEXT}}
 
 Supplemental Context Notes:
 {{CONTEXT_NOTES}}
@@ -38,4 +44,7 @@ Output requirements:
 - Follow recruiter instruction notes only when they are consistent with source truth and the one-page budget.
 - Explicitly include support keywords in bullets where supported by existing evidence.
 - Keep claims strictly truthful to source material.
+- Preserve reverse-chronological ordering inside Experience and Projects unless the canonical source proves a different order.
+- If the primary resume input is plain text, convert it into valid compile-safe LaTeX using the canonical layout guidance and only the evidence provided.
+- In metadata, explain briefly why the selected experience/project mix is relevant and whether chronology was preserved.
 - Return only the required JSON object with metadata.
