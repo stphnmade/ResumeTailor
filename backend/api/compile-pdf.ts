@@ -132,6 +132,7 @@ function buildSingleFileTar(fileName: string, content: Buffer): Buffer {
 
 function normalizeTexForRemoteCompile(tex: string): string {
   return tex
+    .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
     .replace(/\u2013/g, "--") // en dash
     .replace(/\u2014/g, "---") // em dash
     .replace(/\u2212/g, "-") // minus sign

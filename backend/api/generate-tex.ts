@@ -257,6 +257,12 @@ function extractJson(text: string): any {
   }
 }
 
+function sanitizeGeneratedTex(tex: string): string {
+  return String(tex || "")
+    .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
+    .trim();
+}
+
 function normalizeText(input: string): string {
   return (input || "")
     .toLowerCase()
@@ -737,7 +743,7 @@ function addTokenUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
 }
 
 function parseModelPayload(parsed: any): ModelPayload {
-  const optimizedTex = String(parsed?.optimized_tex || "").trim();
+  const optimizedTex = sanitizeGeneratedTex(parsed?.optimized_tex || "");
   const keywordFocus = Array.isArray(parsed?.metadata?.keyword_focus)
     ? parsed.metadata.keyword_focus.map((x: any) => String(x))
     : [];
