@@ -87,7 +87,13 @@ const RESUME_OUTPUT_SCHEMA = {
     metadata: {
       type: "object",
       additionalProperties: false,
-      required: ["keyword_focus", "removed_projects", "included_projects"],
+      required: [
+        "keyword_focus",
+        "removed_projects",
+        "included_projects",
+        "relevance_summary",
+        "chronology_summary",
+      ],
       properties: {
         keyword_focus: {
           type: "array",
