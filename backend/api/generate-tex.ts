@@ -269,9 +269,20 @@ function extractJson(text: string): any {
 }
 
 function sanitizeGeneratedTex(tex: string): string {
-  return String(tex || "")
-    .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
-    .trim();
+  const raw = String(tex || "").replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`);
+  const beginDocument = raw.indexOf("\\begin{document}");
+  const endDocument = raw.lastIndexOf("\\end{document}");
+
+  if (beginDocument === -1 || endDocument === -1 || endDocument <= beginDocument) {
+    return raw.trim();
+  }
+
+  const bodyStart = beginDocument + "\\begin{document}".length;
+  const preamble = raw.slice(0, bodyStart);
+  const body = raw.slice(bodyStart, endDocument).replace(/(?<!\\)&/g, "\\&");
+  const suffix = raw.slice(endDocument);
+
+  return `${preamble}${body}${suffix}`.trim();
 }
 
 function isLatexResumeSource(input: string): boolean {

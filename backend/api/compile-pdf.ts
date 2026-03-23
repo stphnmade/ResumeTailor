@@ -17,6 +17,8 @@ const REMOTE_QUERY_URL_MAX_LEN = 120_000;
 const REMOTE_FALLBACK_HOSTS = Array.from(
   new Set([LATEXONLINE_BASE_URL, "https://latexonline.cc"])
 );
+const BEGIN_DOC = "\\begin{document}";
+const END_DOC = "\\end{document}";
 
 function setCors(res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
@@ -130,8 +132,28 @@ function buildSingleFileTar(fileName: string, content: Buffer): Buffer {
   return Buffer.concat([header, content, contentPadding, eofPadding]);
 }
 
+function normalizeTexForCompilation(tex: string): string {
+  const raw = String(tex || "");
+  const beginDocument = raw.indexOf(BEGIN_DOC);
+  const endDocument = raw.lastIndexOf(END_DOC);
+
+  if (beginDocument === -1 || endDocument === -1 || endDocument <= beginDocument) {
+    return raw.replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`);
+  }
+
+  const bodyStart = beginDocument + BEGIN_DOC.length;
+  const preamble = raw.slice(0, bodyStart);
+  const body = raw
+    .slice(bodyStart, endDocument)
+    .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
+    .replace(/(?<!\\)&/g, "\\&");
+  const suffix = raw.slice(endDocument);
+
+  return `${preamble}${body}${suffix}`;
+}
+
 function normalizeTexForRemoteCompile(tex: string): string {
-  return tex
+  return normalizeTexForCompilation(tex)
     .replace(/\\\\([&%$#_])/g, (_match, symbol: string) => `\\${symbol}`)
     .replace(/\u2013/g, "--") // en dash
     .replace(/\u2014/g, "---") // em dash
@@ -256,7 +278,8 @@ export default async function handler(
   let workDir = "";
 
   try {
-    const tex = typeof req.body?.tex === "string" ? req.body.tex : "";
+    const incomingTex = typeof req.body?.tex === "string" ? req.body.tex : "";
+    const tex = normalizeTexForCompilation(incomingTex);
 
     if (!tex) {
       return res.status(400).json({ error: "Missing input" });
