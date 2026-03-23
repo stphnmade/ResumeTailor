@@ -41,8 +41,11 @@ Recruiter Instruction Notes:
 Output requirements:
 - Prioritize ATS language alignment while preserving truth.
 - Keep the resume to one page; never choose comprehensiveness over page fit.
+- Use the available one-page space aggressively when supported by evidence so the final resume feels full, dense, and competitive rather than sparse.
 - Follow recruiter instruction notes only when they are consistent with source truth and the one-page budget.
 - Explicitly include support keywords in bullets where supported by existing evidence.
+- Rewrite generic bullets into sharper, more specific bullets that foreground tools, scope, operational ownership, and outcomes when the source supports that framing.
+- If a selected role or project contains enough verified detail, you may add bullets by decomposing existing source evidence into separate high-value points; do not invent new facts.
 - Keep claims strictly truthful to source material.
 - Preserve reverse-chronological ordering inside Experience and Projects unless the canonical source proves a different order.
 - If the primary resume input is plain text, convert it into valid compile-safe LaTeX using the canonical layout guidance and only the evidence provided.
