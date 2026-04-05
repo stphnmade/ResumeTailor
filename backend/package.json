@@ -2,8 +2,18 @@
   "name": "resume-tailor-backend",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "node prisma/seed.mjs"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
   "dependencies": {
+    "@prisma/client": "^6.17.1",
     "@vercel/node": "^3.0.0",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "prisma": "^6.17.1"
   }
 }

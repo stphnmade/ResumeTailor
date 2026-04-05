@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BACKEND_URL, compilePdf, generateCoverLetter, generateTex } from './api';
+import { DashboardShell } from './dashboard/DashboardShell';
+import { useAppPath } from './router';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
@@ -231,7 +233,7 @@ function makeLog(kind, summary, details) {
   };
 }
 
-export default function App() {
+function ManualStudio() {
   const [activeTab, setActiveTab] = useState('resume');
   const [resumeDraft, setResumeDraft] = useState('');
   const [jobDraft, setJobDraft] = useState('');
@@ -1189,4 +1191,14 @@ export default function App() {
       ) : null}
     </div>
   );
+}
+
+export default function App() {
+  const { pathname, navigate } = useAppPath();
+
+  if (pathname === '/dashboard' || pathname === '/dashboard/inbox' || pathname === '/dashboard/review' || pathname === '/dashboard/tracker') {
+    return <DashboardShell pathname={pathname} onNavigate={navigate} />;
+  }
+
+  return <ManualStudio />;
 }

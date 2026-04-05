@@ -367,7 +367,134 @@ pre {
   color: var(--error);
 }
 
+.dashboard-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.dashboard-sidebar {
+  background: #17212b;
+  color: #eef4fb;
+  padding: 18px 16px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.dashboard-sidebar h1,
+.dashboard-header h1 {
+  margin: 0;
+}
+
+.dashboard-kicker {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a9bfd8;
+}
+
+.dashboard-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-link {
+  color: #dbe8f5;
+  text-decoration: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.dashboard-link.active,
+.dashboard-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-main {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-header p,
+.dashboard-copy,
+.dashboard-meta,
+.dashboard-empty p {
+  color: var(--muted);
+}
+
+.dashboard-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-stat {
+  background: #f7f9fc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-stat span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dashboard-stat strong {
+  font-size: 1.75rem;
+}
+
+.dashboard-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.dashboard-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fbfcfe;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #e9f1ff;
+  color: var(--accent);
+}
+
 @media (max-width: 1050px) {
+  .dashboard-shell,
+  .dashboard-cards,
   .filename-grid,
   .settings-grid,
   .drawer-grid-wide {

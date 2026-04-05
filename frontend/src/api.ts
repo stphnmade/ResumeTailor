@@ -210,3 +210,41 @@ export async function compilePdf(tex: string): Promise<Blob> {
 
   return await res.blob();
 }
+
+export type JobRecord = {
+  id: string;
+  title: string;
+  company: string;
+  location?: string | null;
+  description?: string | null;
+  url: string;
+  source: string;
+  createdAt: string;
+};
+
+export type ApplicationRecord = {
+  id: string;
+  jobId: string;
+  status: "captured" | "scored" | "approved" | "applied";
+  resumeId?: string | null;
+  createdAt: string;
+  job: JobRecord;
+};
+
+export async function getJobs(): Promise<JobRecord[]> {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/jobs`, { method: "GET" }, 15_000);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Jobs request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.jobs) ? data.jobs : [];
+}
+
+export async function getApplications(): Promise<ApplicationRecord[]> {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/applications`, { method: "GET" }, 15_000);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Applications request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.applications) ? data.applications : [];
+}
