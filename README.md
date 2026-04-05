@@ -4,17 +4,41 @@ This repository is split into:
 
 - `frontend/` - Vite + React app for GitHub Pages
 - `backend/` - Vercel serverless API (`backend/api/*`)
+- `rae/` + `tailor.py` - local Python resume alignment engine and CLI
+
+## Product Surfaces
+
+- `v1: Manual Studio`
+  The current user-facing web product lives in `frontend/src/App.jsx` and the serverless handlers in `backend/api/*`.
+  It is a single-page workflow with two tabs:
+  `Resume` for tailored resume generation and review
+  `Plus` for cover letter generation and review
+- `Local CLI / engine`
+  The Python path in `tailor.py` and `rae/*` is a separate local tooling surface for LaTeX parsing, scoring, alignment, and optional bullet rewriting.
+- `v2 beta (planned, not implemented here)`
+  The repo is being prepared for a parallel `dashboard`-based workflow plus extension-assisted job application pipeline without replacing v1.
+
+## Route Stance
+
+- Keep the current root experience unchanged for now.
+- Reserve `/manual` as the explicit v1 "Manual Studio" route once frontend routing is introduced.
+- Reserve `/dashboard` as the v2 beta route.
+- Do not migrate current users or break the existing GitHub Pages root route during v2 prep.
 
 ## Repository Layout
 
 - `frontend/index.html`
 - `frontend/src/*`
 - `frontend/vite.config.js` (`base: '/ResumeTailor/'` for GitHub Pages)
+- `tailor.py`
+- `rae/*`
 - `source_of_truth/*` (canonical resume + tailoring rules + JD examples)
 - `backend/api/health.ts`
 - `backend/api/generate-tex.ts`
 - `backend/api/compile-pdf.ts`
+- `backend/api/generate-cover-letter.ts`
 - `backend/lib/prompts/*.md` (prompt templates loaded at runtime)
+- `backend/lib/templates/*`
 - `backend/vercel.json`
 - `.github/workflows/deploy-pages.yml`
 
