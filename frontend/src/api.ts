@@ -220,6 +220,7 @@ export type JobRecord = {
   url: string;
   source: string;
   createdAt: string;
+  latestScore?: JobScoreRecord | null;
 };
 
 export type ApplicationRecord = {
@@ -229,6 +230,33 @@ export type ApplicationRecord = {
   resumeId?: string | null;
   createdAt: string;
   job: JobRecord;
+};
+
+export type JobScoreRecord = {
+  id: string;
+  score: number;
+  createdAt: string;
+  explanation?: {
+    resumeMode?: string;
+    totalScore?: number;
+    scoreBand?: string;
+    archiveByDefault?: boolean;
+    explanation?: string;
+    adjustments?: Array<{
+      code: string;
+      type: string;
+      points: number;
+      reason: string;
+    }>;
+    factors?: Array<{
+      key: string;
+      label: string;
+      weight: number;
+      rawScore: number;
+      weightedScore: number;
+      notes: string;
+    }>;
+  } | null;
 };
 
 export async function getJobs(): Promise<JobRecord[]> {
@@ -247,4 +275,21 @@ export async function getApplications(): Promise<ApplicationRecord[]> {
     throw new Error(String(data?.error || `Applications request failed: ${res.status}`));
   }
   return Array.isArray(data?.applications) ? data.applications : [];
+}
+
+export async function scoreJobs(params: { resumeMode: string; jobId?: string }) {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/score-jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resumeMode: params.resumeMode,
+      jobId: params.jobId || undefined,
+    }),
+  }, 30_000);
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Scoring request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.results) ? data.results : [];
 }

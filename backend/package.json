@@ -5,7 +5,9 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "node prisma/seed.mjs"
+    "prisma:seed": "node prisma/seed.mjs",
+    "score:all": "node scripts/score-jobs.js --all --mode \"IT / Systems / Automation\"",
+    "test:scoring": "node --test tests/scoring.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
