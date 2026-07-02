@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum ApplicationStatus {
+  captured
+  scored
+  approved
+  applied
+}
+
+enum ActivityEntityType {
+  job
+  application
+}
+
+model Job {
+  id           String            @id @default(cuid())
+  title        String
+  company      String
+  location     String?
+  description  String?
+  url          String            @unique
+  source       String
+  createdAt    DateTime          @default(now()) @map("created_at")
+  scores       JobScore[]
+  applications Application[]
+  resumes      GeneratedResume[]
+
+  @@map("jobs")
+}
+
+model JobScore {
+  id          String   @id @default(cuid())
+  jobId       String   @map("job_id")
+  score       Float
+  explanation String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("job_scores")
+}
+
+model Application {
+  id         String            @id @default(cuid())
+  jobId      String            @map("job_id")
+  status     ApplicationStatus @default(captured)
+  resumeId   String?           @map("resume_id")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  job        Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resume     GeneratedResume?  @relation("ApplicationResume", fields: [resumeId], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@index([resumeId])
+  @@map("applications")
+}
+
+model GeneratedResume {
+  id           String         @id @default(cuid())
+  jobId        String         @map("job_id")
+  mode         String
+  latexContent String         @map("latex_content")
+  pdfUrl       String?        @map("pdf_url")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  job          Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applications Application[] @relation("ApplicationResume")
+
+  @@index([jobId])
+  @@map("generated_resumes")
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  linkedin  String?
+  github    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("user_profiles")
+}
+
+model ActivityLog {
+  id         String             @id @default(cuid())
+  entityType ActivityEntityType @map("entity_type")
+  entityId   String             @map("entity_id")
+  action     String
+  metadata   String?
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}

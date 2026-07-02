@@ -2,8 +2,22 @@
   "name": "resume-tailor-backend",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "node prisma/seed.mjs",
+    "score:all": "node scripts/score-jobs.js --all --mode \"IT / Systems / Automation\"",
+    "test:scoring": "node --test tests/scoring.test.js",
+    "test:jobs": "node --test tests/job-parser.test.js tests/job-scraper.test.js",
+    "test:jobs:live": "node scripts/validate-live-jobs.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
   "dependencies": {
+    "@prisma/client": "^6.17.1",
     "@vercel/node": "^3.0.0",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "prisma": "^6.17.1"
   }
 }

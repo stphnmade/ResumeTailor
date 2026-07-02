@@ -5,6 +5,35 @@ export const BACKEND_URL =
 const GENERATE_TIMEOUT_MS = 70_000;
 const COVER_LETTER_TIMEOUT_MS = 60_000;
 const COMPILE_TIMEOUT_MS = 40_000;
+const SCRAPE_TIMEOUT_MS = 35_000;
+
+export type ScrapedJob = {
+  url: string;
+  source: string;
+  extraction_method: string;
+  title: string;
+  role: string;
+  company: string;
+  location: string;
+  description: string;
+  cover_letter: {
+    status: 'required' | 'optional' | 'not_required' | 'not_mentioned';
+    recommended: boolean;
+    confidence: 'high' | 'medium' | 'low';
+    evidence: string;
+  };
+};
+
+export async function scrapeJob(url: string): Promise<ScrapedJob> {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/scrape-job`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  }, SCRAPE_TIMEOUT_MS);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(String(data?.error || `Job import failed: ${res.status}`));
+  return data as ScrapedJob;
+}
 
 export type GenerateTexResponse = {
   optimized_tex: string;
@@ -209,4 +238,87 @@ export async function compilePdf(tex: string): Promise<Blob> {
   }
 
   return await res.blob();
+}
+
+export type JobRecord = {
+  id: string;
+  title: string;
+  company: string;
+  location?: string | null;
+  description?: string | null;
+  url: string;
+  source: string;
+  createdAt: string;
+  latestScore?: JobScoreRecord | null;
+};
+
+export type ApplicationRecord = {
+  id: string;
+  jobId: string;
+  status: "captured" | "scored" | "approved" | "applied";
+  resumeId?: string | null;
+  createdAt: string;
+  job: JobRecord;
+};
+
+export type JobScoreRecord = {
+  id: string;
+  score: number;
+  createdAt: string;
+  explanation?: {
+    resumeMode?: string;
+    totalScore?: number;
+    scoreBand?: string;
+    archiveByDefault?: boolean;
+    explanation?: string;
+    adjustments?: Array<{
+      code: string;
+      type: string;
+      points: number;
+      reason: string;
+    }>;
+    factors?: Array<{
+      key: string;
+      label: string;
+      weight: number;
+      rawScore: number;
+      weightedScore: number;
+      notes: string;
+    }>;
+  } | null;
+};
+
+export async function getJobs(): Promise<JobRecord[]> {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/jobs`, { method: "GET" }, 15_000);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Jobs request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.jobs) ? data.jobs : [];
+}
+
+export async function getApplications(): Promise<ApplicationRecord[]> {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/applications`, { method: "GET" }, 15_000);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Applications request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.applications) ? data.applications : [];
+}
+
+export async function scoreJobs(params: { resumeMode: string; jobId?: string }) {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/score-jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resumeMode: params.resumeMode,
+      jobId: params.jobId || undefined,
+    }),
+  }, 30_000);
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(String(data?.error || `Scoring request failed: ${res.status}`));
+  }
+  return Array.isArray(data?.results) ? data.results : [];
 }

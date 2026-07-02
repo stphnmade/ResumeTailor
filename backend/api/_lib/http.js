@@ -7,12 +7,16 @@ function setJson(res, statusCode, payload) {
 }
 
 function applyCors(req, res) {
-  const allowed = ['https://stphnmade.github.io'];
+  const allowed = [
+    'https://stphnmade.github.io',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
   const origin = req.headers.origin || '';
   const originAllowed = allowed.includes(origin);
 
   if (originAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', 'https://stphnmade.github.io');
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
