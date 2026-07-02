@@ -2,8 +2,8 @@ export const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '') ??
   'https://resumetailor-ivory.vercel.app';
 
-const GENERATE_TIMEOUT_MS = 70_000;
-const COVER_LETTER_TIMEOUT_MS = 60_000;
+const GENERATE_TIMEOUT_MS = 115_000;
+const COVER_LETTER_TIMEOUT_MS = 95_000;
 const COMPILE_TIMEOUT_MS = 40_000;
 const SCRAPE_TIMEOUT_MS = 35_000;
 

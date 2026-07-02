@@ -1,1 +1,10 @@
-{}
+{
+  "functions": {
+    "api/generate-tex.ts": {
+      "maxDuration": 120
+    },
+    "api/generate-cover-letter.ts": {
+      "maxDuration": 90
+    }
+  }
+}
