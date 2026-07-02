@@ -10,9 +10,10 @@ This repository is split into:
 
 - `v1: Manual Studio`
   The current user-facing web product lives in `frontend/src/App.jsx` and the serverless handlers in `backend/api/*`.
-  It is a single-page workflow with two tabs:
+  It is a single-page workflow with three tabs:
   `Resume` for tailored resume generation and review
   `Plus` for cover letter generation and review
+  `Bundled Send` for importing a job URL, reviewing parsed fields, and generating a resume plus an inferred/overridden cover letter
 - `Local CLI / engine`
   The Python path in `tailor.py` and `rae/*` is a separate local tooling surface for LaTeX parsing, scoring, alignment, and optional bullet rewriting.
 - `v2 beta (planned, not implemented here)`
@@ -37,6 +38,9 @@ This repository is split into:
 - `backend/api/generate-tex.ts`
 - `backend/api/compile-pdf.ts`
 - `backend/api/generate-cover-letter.ts`
+- `backend/api/scrape-job.ts`
+- `backend/lib/job-scraper.js` (HTTPS fetch, redirect/size/time limits, SSRF checks, free Reader fallback)
+- `backend/lib/job-parser.js` (JSON-LD, HiringCafe, LinkedIn, and cover-letter inference)
 - `backend/lib/prompts/*.md` (prompt templates loaded at runtime)
 - `backend/lib/templates/*`
 - `backend/vercel.json`
@@ -95,3 +99,12 @@ Note: remote fallback sends LaTeX source to the configured remote compiler endpo
 5. Canonical resume asset is reachable:
    - `GET https://stphnmade.github.io/ResumeTailor/source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex`
    - Expected status: `200`
+
+## Job Import Verification
+
+From `backend/`:
+
+- `npm run test:jobs` runs deterministic parser, fallback, redirect, blocking, and SSRF tests.
+- `npm run test:jobs:live` checks three current HiringCafe postings and three current LinkedIn postings for exact title/company extraction, meaningful description length, and navigation-chrome removal.
+
+The live suite intentionally depends on third-party postings. A removed job or temporary anti-bot response should fail the suite and prompt replacement of that sample; it should never be accepted as a job description.

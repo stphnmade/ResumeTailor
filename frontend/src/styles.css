@@ -276,14 +276,14 @@ textarea {
 
 .filename-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr auto;
   gap: 8px;
   align-items: end;
 }
 
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) auto;
   gap: 8px;
   align-items: end;
 }
@@ -547,6 +547,51 @@ pre {
   color: var(--error);
   border-radius: 8px;
   padding: 10px 12px;
+}
+
+.job-import-box {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.job-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.job-url-row input {
+  width: 100%;
+}
+
+.bundle-options {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.bundle-options label {
+  min-width: 280px;
+}
+
+.bundle-autofill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bundle-autofill-grid input {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .job-url-row { grid-template-columns: 1fr; }
+  .bundle-options { align-items: stretch; flex-direction: column; }
+  .bundle-autofill-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 1050px) {

@@ -1,20 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BACKEND_URL, compilePdf, generateCoverLetter, generateTex } from './api';
+import { BACKEND_URL, compilePdf, generateCoverLetter, generateTex, scrapeJob } from './api';
 import { DashboardShell } from './dashboard/DashboardShell';
+import { extractRoleCompanyFromJD, shouldGenerateCoverLetter } from './lib/jobAutofill.mjs';
 import { useAppPath } from './router';
+import canonicalResumeSource from '../../source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex?raw';
 
 const MAX_RESUME_BYTES = 200 * 1024;
 const MAX_JD_CHARS = 30000;
-const CANONICAL_RESUME_PATH = 'source_of_truth/resumes/stephen_syl_akinwale__resume__source.tex';
-
 const TONE_OPTIONS = ['professional', 'confident', 'warm'];
 const LENGTH_OPTIONS = ['concise', 'standard', 'detailed'];
-
-function canonicalResumeUrl() {
-  const base = import.meta.env.BASE_URL || '/';
-  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-  return `${normalizedBase}${CANONICAL_RESUME_PATH}`;
-}
 
 function sanitizeToken(value, maxLen = 40) {
   return String(value || '')
@@ -24,52 +18,6 @@ function sanitizeToken(value, maxLen = 40) {
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '')
     .slice(0, maxLen);
-}
-
-function cleanJobText(value) {
-  return String(value || '')
-    .replace(/[“”]/g, '"')
-    .replace(/[’]/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function cleanDetectionLine(value) {
-  return String(value || '')
-    .replace(/^[\s\-*•|:]+/, '')
-    .replace(/\s+/g, ' ')
-    .replace(/[|:]+$/g, '')
-    .trim();
-}
-
-function isLikelyNoiseLine(line) {
-  return !line || /^(job description|about (the )?role|responsibilities|requirements|qualifications|preferred|benefits|location|salary|hours|schedule)$/i.test(line);
-}
-
-function looksLikeRoleLine(line) {
-  return /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant|designer|architect|scientist|coordinator|technician|associate|lead|director|recruiter|writer|editor|intern)\b/i.test(
-    line
-  );
-}
-
-function looksLikeCompanyLine(line) {
-  return /\b(inc|llc|ltd|corp|company|technologies|technology|systems|solutions|labs|group|partners|university|health|bank|services|studio|media)\b/i.test(
-    line
-  );
-}
-
-function cleanDetectedEntity(value, kind) {
-  const cleaned = cleanDetectionLine(value)
-    .replace(/\b(remote|hybrid|onsite)\b/gi, '')
-    .replace(/\s+\|\s+.*/g, '')
-    .replace(/\s+-\s+(remote|hybrid|onsite).*$/i, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-
-  if (!cleaned || isLikelyNoiseLine(cleaned)) return '';
-  if (kind === 'role' && cleaned.length > 90) return '';
-  if (kind === 'company' && cleaned.length > 70) return '';
-  return cleaned;
 }
 
 function extractCandidateNameFromTex(tex) {
@@ -94,106 +42,6 @@ function extractCandidateNameFromTex(tex) {
 function isLatexResumeSource(text) {
   const value = String(text || '').trim();
   return value.includes('\\documentclass') || value.includes('\\begin{document}') || value.includes('\\section{');
-}
-
-function extractRoleCompanyFromJD(jd) {
-  const jdText = cleanJobText(jd);
-  const lines = String(jd || '')
-    .split(/\r?\n/)
-    .map((line) => cleanDetectionLine(line))
-    .filter((line) => line && !isLikelyNoiseLine(line));
-
-  const topLines = lines.slice(0, 12);
-
-  for (let index = 0; index < Math.min(topLines.length, 6); index += 1) {
-    const line = topLines[index];
-    const nextLine = topLines[index + 1] || '';
-
-    const joinAsMatch = line.match(/^(.*?)\s+(?:is hiring for|is seeking|seeks|hiring for|hiring)\s+(?:an?\s+)?(.+)$/i);
-    if (joinAsMatch?.[1] && joinAsMatch?.[2]) {
-      const company = cleanDetectedEntity(joinAsMatch[1], 'company');
-      const role = cleanDetectedEntity(joinAsMatch[2], 'role');
-      if (role || company) return { role, company };
-    }
-
-    const roleAtCompanyMatch = line.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i);
-    if (roleAtCompanyMatch?.[1] && roleAtCompanyMatch?.[2]) {
-      const role = cleanDetectedEntity(roleAtCompanyMatch[1], 'role');
-      const company = cleanDetectedEntity(roleAtCompanyMatch[2], 'company');
-      if ((looksLikeRoleLine(role) || role) && company) return { role, company };
-    }
-
-    if (looksLikeRoleLine(line) && nextLine && !looksLikeRoleLine(nextLine)) {
-      const role = cleanDetectedEntity(line, 'role');
-      const company = cleanDetectedEntity(nextLine, 'company');
-      if (role || company) return { role, company };
-    }
-
-    if (looksLikeCompanyLine(line) && nextLine && looksLikeRoleLine(nextLine)) {
-      const company = cleanDetectedEntity(line, 'company');
-      const role = cleanDetectedEntity(nextLine, 'role');
-      if (role || company) return { role, company };
-    }
-
-    const splitMatch = line.match(/^(.+?)\s+(?:@|at|-)\s+(.+)$/i);
-    if (splitMatch?.[1] && splitMatch?.[2]) {
-      const left = cleanDetectedEntity(splitMatch[1], 'role');
-      const right = cleanDetectedEntity(splitMatch[2], 'company');
-      if (looksLikeRoleLine(left) || looksLikeCompanyLine(right)) {
-        return { role: left, company: right };
-      }
-    }
-  }
-
-  let company = '';
-  const companyPatterns = [
-    /\b(?:company|organization|employer)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
-    /\b(?:about us|about the company)\s*:?\s*([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
-    /\bHere at\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})[,.\s]/i,
-    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+hiring\b/i,
-    /\b([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+is\s+seeking\b/i,
-    /\bJoin\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\s+as\b/i,
-    /\bAbout\s+([A-Z][A-Za-z0-9&.'\- ]{1,60})\b/i,
-  ];
-  for (const pattern of companyPatterns) {
-    const match = jdText.match(pattern);
-    if (match?.[1]) {
-      company = cleanDetectedEntity(match[1], 'company');
-      break;
-    }
-  }
-
-  if (!company) {
-    const titleCaseLine = topLines.find((line) => /^[A-Z][A-Za-z0-9&.'\- ]{1,60}$/.test(line) && !looksLikeRoleLine(line));
-    if (titleCaseLine) company = cleanDetectedEntity(titleCaseLine, 'company');
-  }
-
-  let role = '';
-  const rolePatterns = [
-    /\b(?:job title|title|role|position)\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
-    /\bJoin\s+[A-Z][A-Za-z0-9&.'\- ]{1,60}\s+as\s+(?:an?\s+)?([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
-    /\b(?:hiring|seeking)\s+an?\s+([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=\s+to\b|[.,\n]|$)/i,
-    /\bRole\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
-    /\bPosition\s*:?\s*([A-Z][A-Za-z0-9/&()\- ]{2,80}?)(?=[.,\n]|$)/i,
-  ];
-  for (const pattern of rolePatterns) {
-    const match = jdText.match(pattern);
-    if (match?.[1]) {
-      role = cleanDetectedEntity(match[1], 'role');
-      break;
-    }
-  }
-
-  if (!role) {
-    const roleLine = topLines.find(
-      (line) =>
-        /\b(engineer|developer|analyst|manager|specialist|support|administrator|consultant)\b/i.test(line) &&
-        !looksLikeCompanyLine(line)
-    );
-    if (roleLine) role = cleanDetectedEntity(roleLine, 'role');
-  }
-
-  return { role, company };
 }
 
 function buildDownloadBaseNameFromParts(candidateName, companyName, roleName) {
@@ -279,6 +127,11 @@ function ManualStudio() {
   const [hiringManager, setHiringManager] = useState('');
   const [coverLetterTone, setCoverLetterTone] = useState('professional');
   const [coverLetterLength, setCoverLetterLength] = useState('standard');
+  const [jobUrl, setJobUrl] = useState('');
+  const [scrapedJob, setScrapedJob] = useState(null);
+  const [isScraping, setIsScraping] = useState(false);
+  const [isBundling, setIsBundling] = useState(false);
+  const [coverLetterChoice, setCoverLetterChoice] = useState('auto');
 
   const pdfPreviewUrlRef = useRef('');
   const coverLetterPdfPreviewUrlRef = useRef('');
@@ -339,10 +192,7 @@ function ManualStudio() {
     setError('');
     setIsLoadingCanonical(true);
     try {
-      const res = await fetch(canonicalResumeUrl(), { method: 'GET' });
-      if (!res.ok) throw new Error(`Canonical resume fetch failed: ${res.status}`);
-      const tex = await res.text();
-      setResumeDraft(tex);
+      setResumeDraft(canonicalResumeSource);
     } catch (err) {
       setError(String(err?.message || err));
     } finally {
@@ -691,6 +541,90 @@ function ManualStudio() {
     }
   }
 
+  async function onImportJob() {
+    setError('');
+    setIsScraping(true);
+    try {
+      const imported = await scrapeJob(jobUrl.trim());
+      setScrapedJob(imported);
+      setJobDraft(imported.description || '');
+      if (imported.company) {
+        setDownloadCompany(imported.company);
+        setDownloadCompanyEdited(true);
+      }
+      if (imported.role || imported.title) {
+        setDownloadRole(imported.role || imported.title);
+        setDownloadRoleEdited(true);
+      }
+      appendLog('job-import', `Imported ${imported.title || 'job posting'}`, {
+        url: imported.url,
+        source: imported.source,
+        extraction_method: imported.extraction_method,
+        company: imported.company,
+        role: imported.role,
+        description_characters: imported.description?.length || 0,
+        cover_letter: imported.cover_letter,
+      });
+    } catch (err) {
+      const message = String(err?.message || err);
+      setError(message);
+      appendLog('job-import', 'Job import failed', { url: jobUrl, error: message });
+    } finally {
+      setIsScraping(false);
+    }
+  }
+
+  async function onGenerateBundle() {
+    setError('');
+    const invalid = validateGenerateInputs();
+    if (invalid) return setError(invalid);
+    setIsBundling(true);
+    try {
+      const resumeData = await generateTex(resumeDraft, jobDraft, contextNotes, recruiterNotes);
+      const nextResumeTex = resumeData.optimized_tex || '';
+      const resumeVersion = createVersion(nextResumeTex, resumeData.metadata || null);
+      setAppliedAt(new Date().toLocaleString());
+      clearPdfPreview();
+      await compileCurrent({ tex: nextResumeTex, label: resumeVersion.label });
+
+      const inference = scrapedJob?.cover_letter;
+      const includeLetter = shouldGenerateCoverLetter(coverLetterChoice, inference);
+      if (includeLetter) {
+        const letterData = await generateCoverLetter({
+          resumeTex: nextResumeTex,
+          jobDescription: jobDraft,
+          contextNotes,
+          recruiterNotes,
+          roleName: resolvedDownloadRole,
+          companyName: resolvedDownloadCompany,
+          hiringManager,
+          tone: coverLetterTone,
+          length: coverLetterLength,
+        });
+        createCoverLetterVersion(letterData.cover_letter_tex || '', letterData.metadata || null);
+        setCoverLetterAppliedAt(new Date().toLocaleString());
+        clearCoverLetterPreview();
+      } else {
+        setCoverLetterTex('');
+        setSelectedCoverLetterVersionId('');
+        setCoverLetterMetadata(null);
+        clearCoverLetterPreview();
+      }
+      appendLog('bundle', 'Bundled generation complete', {
+        resume: resumeVersion.label,
+        cover_letter_generated: includeLetter,
+        cover_letter_choice: coverLetterChoice,
+        inference: inference || null,
+      });
+    } catch (err) {
+      const message = String(err?.message || err);
+      setError(message);
+      appendLog('bundle', 'Bundled generation failed', { error: message });
+    } finally {
+      setIsBundling(false);
+    }
+  }
+
   async function onCopyTex() {
     if (!editorTex) return;
     try {
@@ -817,6 +751,10 @@ function ManualStudio() {
             <input type="text" value={autoCandidateName} readOnly />
           </label>
           <label className="filename-field">
+            Title (auto)
+            <input type="text" value={detectedFromJD.title || ''} readOnly placeholder="detected job title" />
+          </label>
+          <label className="filename-field">
             Company
             <input
               type="text"
@@ -847,7 +785,7 @@ function ManualStudio() {
             Download name: <code>{`${activeBaseName}.pdf`}</code>
           </div>
           <div className="hint">
-            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>
+            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>, title <code>{detectedFromJD.title || 'not found'}</code>
           </div>
         </div>
       </>
@@ -893,6 +831,10 @@ function ManualStudio() {
           <label className="filename-field">
             Candidate (auto)
             <input type="text" value={autoCandidateName} readOnly />
+          </label>
+          <label className="filename-field">
+            Title (auto)
+            <input type="text" value={detectedFromJD.title || ''} readOnly placeholder="detected job title" />
           </label>
           <label className="filename-field">
             Company
@@ -954,12 +896,35 @@ function ManualStudio() {
             Download name: <code>{`${activeCoverLetterBaseName}.pdf`}</code>
           </div>
           <div className="hint">
-            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>
+            JD detection: company <code>{detectedFromJD.company || 'not found'}</code>, role <code>{detectedFromJD.role || 'not found'}</code>, title <code>{detectedFromJD.title || 'not found'}</code>
           </div>
           <div className="hint">
             Plus stays `.tex`-first, but you can try a PDF preview when compilation is available.
           </div>
         </div>
+      </>
+    );
+  }
+
+  function renderBundleToolbar() {
+    const inference = scrapedJob?.cover_letter;
+    return (
+      <>
+        <div className="row">
+          <button type="button" className="secondary" onClick={() => setDrawerOpen((value) => !value)}>
+            {drawerOpen ? 'Hide Inputs' : 'Show Inputs'}
+          </button>
+          <button type="button" onClick={() => void onGenerateBundle()} disabled={isBundling || !resumeDraft.trim() || !jobDraft.trim()}>
+            {isBundling ? 'Building bundle...' : 'Generate Bundled Send'}
+          </button>
+        </div>
+        <div className="row meta-row">
+          <span>Imported via: <strong>{scrapedJob?.extraction_method || 'not yet'}</strong></span>
+          <span>Source: <strong>{scrapedJob?.source || 'not yet'}</strong></span>
+          <span>Cover letter: <strong>{inference?.status || 'not inferred'}</strong></span>
+          <span>Confidence: <strong>{inference?.confidence || '—'}</strong></span>
+        </div>
+        {inference ? <div className="hint">Inference evidence: {inference.evidence}</div> : null}
       </>
     );
   }
@@ -986,13 +951,73 @@ function ManualStudio() {
         >
           Plus
         </button>
+        <button
+          type="button"
+          className={`tab-button ${activeTab === 'bundle' ? 'active' : ''}`}
+          onClick={() => setActiveTab('bundle')}
+        >
+          Bundled Send
+        </button>
       </section>
 
-      <section className="toolbar card">{activeTab === 'resume' ? renderResumeToolbar() : renderPlusToolbar()}</section>
+      <section className="toolbar card">
+        {activeTab === 'resume' ? renderResumeToolbar() : activeTab === 'plus' ? renderPlusToolbar() : renderBundleToolbar()}
+      </section>
 
       {drawerOpen ? (
         <section className="card drawer-card">
-          <h2>{activeTab === 'resume' ? 'Resume Inputs' : 'Shared Inputs'}</h2>
+          <h2>{activeTab === 'resume' ? 'Resume Inputs' : activeTab === 'bundle' ? 'Bundled Send Inputs' : 'Shared Inputs'}</h2>
+          {activeTab === 'bundle' ? (
+            <div className="job-import-box">
+              <label htmlFor="job-url">Job posting URL</label>
+              <div className="job-url-row">
+                <input id="job-url" type="url" value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} placeholder="https://hiring.cafe/job/... or https://linkedin.com/jobs/view/..." />
+                <button type="button" onClick={() => void onImportJob()} disabled={isScraping || !jobUrl.trim()}>
+                  {isScraping ? 'Importing...' : 'Import & auto-fill'}
+                </button>
+              </div>
+              <div className="bundle-options">
+                <label>Cover letter behavior
+                  <select value={coverLetterChoice} onChange={(event) => setCoverLetterChoice(event.target.value)}>
+                    <option value="auto">Auto (use posting inference)</option>
+                    <option value="include">Always include</option>
+                    <option value="skip">Skip</option>
+                  </select>
+                </label>
+                <span className="hint">Auto generates a letter only when the posting requires or explicitly invites one.</span>
+              </div>
+              {scrapedJob ? (
+                <div className="bundle-autofill-grid">
+                  <label>
+                    Company
+                    <input
+                      type="text"
+                      value={downloadCompany}
+                      onChange={(event) => {
+                        setDownloadCompanyEdited(true);
+                        setDownloadCompany(event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Role
+                    <input
+                      type="text"
+                      value={downloadRole}
+                      onChange={(event) => {
+                        setDownloadRoleEdited(true);
+                        setDownloadRole(event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Location
+                    <input type="text" value={scrapedJob.location || 'Not listed'} readOnly />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="row">
             <label className="inline-check">
               <input type="checkbox" checked={useCanonical} onChange={onToggleCanonical} />
@@ -1017,8 +1042,9 @@ function ManualStudio() {
               />
             </div>
             <div>
-              <label>Job description</label>
+              <label htmlFor="job-description">Job description</label>
               <textarea
+                id="job-description"
                 rows={11}
                 value={jobDraft}
                 onChange={(e) => setJobDraft(e.target.value)}
@@ -1118,7 +1144,7 @@ function ManualStudio() {
             )}
           </section>
         </section>
-      ) : (
+      ) : activeTab === 'plus' ? (
         <section className="workspace-grid">
           <section className="card panel-card">
             <h2>Cover Letter LaTeX Editor (working copy)</h2>
@@ -1157,6 +1183,25 @@ function ManualStudio() {
                 ) : (
                   <div className="hint">No PDF preview yet. Generate the letter first, then try the preview button.</div>
                 )}
+              </div>
+            )}
+          </section>
+        </section>
+      ) : (
+        <section className="workspace-grid bundle-workspace">
+          <section className="card panel-card">
+            <h2>Tailored Resume</h2>
+            <textarea className="workspace-editor" value={editorTex} onChange={(e) => onEditorChange(e.target.value)} placeholder="Import a job, then generate the bundle." />
+          </section>
+          <section className="card panel-card">
+            <h2>{coverLetterTex ? 'Cover Letter' : 'Bundle Status'}</h2>
+            {coverLetterTex ? (
+              <textarea className="workspace-editor" value={coverLetterTex} onChange={(e) => onCoverLetterEditorChange(e.target.value)} />
+            ) : (
+              <div className="output-summary">
+                <p>No cover letter generated for this bundle.</p>
+                <p>Inference: <strong>{scrapedJob?.cover_letter?.status || 'Import a posting to analyze it'}</strong></p>
+                <p>{scrapedJob?.cover_letter?.evidence || 'You can override the automatic decision before generation.'}</p>
               </div>
             )}
           </section>
