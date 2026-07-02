@@ -13,6 +13,9 @@ const REMOTE_FALLBACK_ENABLED =
 const LATEXONLINE_BASE_URL = (
   process.env.LATEXONLINE_BASE_URL || "https://texlive2020.latexonline.cc"
 ).replace(/\/$/, "");
+const TEXLIVE_NET_URL = (
+  process.env.TEXLIVE_NET_URL || "https://texlive.net/cgi-bin/latexcgi"
+).replace(/\/$/, "");
 const REMOTE_QUERY_URL_MAX_LEN = 120_000;
 const REMOTE_FALLBACK_HOSTS = Array.from(
   new Set([LATEXONLINE_BASE_URL, "https://latexonline.cc"])
@@ -229,12 +232,32 @@ async function compileWithRemoteQueryEndpoint(baseUrl: string, tex: string): Pro
   return await fetchRemotePdf(url, { method: "GET" }, `${baseUrl}/compile`);
 }
 
+async function compileWithTexLiveNet(tex: string): Promise<Buffer> {
+  const form = new FormData();
+  form.append("engine", "pdflatex");
+  form.append("return", "pdf");
+  form.append("filename[]", "document.tex");
+  form.append("filecontents[]", tex);
+
+  return await fetchRemotePdf(
+    TEXLIVE_NET_URL,
+    { method: "POST", body: form },
+    "texlive.net"
+  );
+}
+
 async function compileWithRemoteLatexOnline(workDir: string, texFileName: string): Promise<Buffer> {
   const texPath = path.join(workDir, texFileName);
   const rawTex = (await readFile(texPath)).toString("utf8");
   const tex = normalizeTexForRemoteCompile(rawTex);
   const texBuffer = Buffer.from(tex, "utf8");
   const errors: string[] = [];
+
+  try {
+    return await compileWithTexLiveNet(tex);
+  } catch (err: any) {
+    errors.push(String(err?.message || err || "texlive.net failed"));
+  }
 
   for (const baseUrl of REMOTE_FALLBACK_HOSTS) {
     try {
