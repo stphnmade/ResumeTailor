@@ -4,7 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const ALLOWED_ORIGIN = "https://stphnmade.github.io";
-const OPENAI_REQUEST_TIMEOUT_MS = 45_000;
+const OPENAI_REQUEST_TIMEOUT_MS = 75_000;
 const OPENAI_MAX_RETRIES = 0;
 const COVER_LETTER_MAX_OUTPUT_TOKENS = 1_800;
 
