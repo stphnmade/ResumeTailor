@@ -7,6 +7,8 @@ const ALLOWED_ORIGIN = "https://stphnmade.github.io";
 const OPENAI_REQUEST_TIMEOUT_MS = 90_000;
 const OPENAI_MAX_RETRIES = 0;
 const RESUME_MAX_OUTPUT_TOKENS = 3_200;
+const PROMPT_RESUME_MAX_CHARS = 11_000;
+const PROMPT_RESUME_MAX_ESTIMATED_LINES = 72;
 
 type ModelPayload = {
   optimizedTex: string;
@@ -862,16 +864,54 @@ function buildCanonicalLayoutGuidance(sourceResumeTex: string, canonicalResume: 
   ].join("\n");
 }
 
+function compactTexForPrompt(tex: string): string {
+  return String(tex || "")
+    .replace(/^\s*%.*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function prepareLatexResumeForPrompt(
+  sourceResumeTex: string,
+  sourceJobDescription: string,
+  supportKeywordTargets: string[]
+): { tex: string; compressed: boolean; estimatedLineCount: number } {
+  const compact = compactTexForPrompt(sourceResumeTex);
+  const estimatedLineCount = estimateRenderedLines(compact);
+  const shouldCompress =
+    compact.length > PROMPT_RESUME_MAX_CHARS ||
+    estimatedLineCount > PROMPT_RESUME_MAX_ESTIMATED_LINES;
+
+  if (!shouldCompress) {
+    return {
+      tex: compact,
+      compressed: false,
+      estimatedLineCount,
+    };
+  }
+
+  const compressed = compressResumeToOnePage(compact, sourceJobDescription, supportKeywordTargets);
+  return {
+    tex: compactTexForPrompt(compressed.tex),
+    compressed: true,
+    estimatedLineCount: compressed.estimatedLineCount,
+  };
+}
+
 function buildPromptContext(
   promptContext: PromptContext,
   sourceResumeTex: string,
   sourceJobDescription: string,
   contextNotes: string,
-  recruiterNotes: string
+  recruiterNotes: string,
+  supportKeywordTargets: string[]
 ): string {
   const inputIsLatex = isLatexResumeSource(sourceResumeTex);
+  const preparedLatex = inputIsLatex
+    ? prepareLatexResumeForPrompt(sourceResumeTex, sourceJobDescription, supportKeywordTargets)
+    : null;
   const primaryResumeInput = inputIsLatex
-    ? sourceResumeTex
+    ? preparedLatex?.tex || sourceResumeTex
     : buildPlainTextResumeSeed(sourceResumeTex, promptContext.canonicalResume);
   const resumeSourceText = inputIsLatex ? "None provided." : sourceResumeTex;
 
@@ -1000,7 +1040,8 @@ export default async function handler(
       sourceResumeTex,
       sourceJobDescription,
       String(context_notes || "").trim() || "None provided.",
-      String(recruiter_notes || "").trim() || "None provided."
+      String(recruiter_notes || "").trim() || "None provided.",
+      supportKeywordTargets
     );
 
     const keySource = process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "none";
