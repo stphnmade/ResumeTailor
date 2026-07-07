@@ -123,21 +123,21 @@ type SupportKeyword = {
 };
 
 const SUPPORT_KEYWORDS: SupportKeyword[] = [
-  { term: "technical support", patterns: ["technical support", "first-level support", "first level support", "l1 support", "helpdesk"] },
-  { term: "troubleshooting", patterns: ["troubleshooting", "diagnosis", "debugging", "triage"] },
-  { term: "incident management", patterns: ["incident", "incident management", "incident response"] },
-  { term: "escalation", patterns: ["escalate", "escalation", "l2", "l3"] },
-  { term: "standard operating procedures", patterns: ["sop", "standard operating procedure", "runbook"] },
-  { term: "documentation", patterns: ["document", "documentation", "knowledge base"] },
-  { term: "ticketing systems", patterns: ["ticket", "ticketing", "servicenow", "jira", "tdx"] },
-  { term: "customer service", patterns: ["customer", "client", "service", "satisfaction"] },
-  { term: "communication", patterns: ["communication", "stakeholder", "phone", "email", "chat"] },
-  { term: "collaboration", patterns: ["collaboration", "team", "cross-functional", "cross functional"] },
+  { term: "technical support", patterns: ["technical support", "first-level support", "first level support", "l1 support", "helpdesk", "desktop support", "end-user support", "end user support"] },
+  { term: "troubleshooting", patterns: ["troubleshooting", "troubleshoot", "troubleshot", "diagnosis", "debugging", "triage", "root cause"] },
+  { term: "incident management", patterns: ["incident", "incidents", "incident management", "incident response"] },
+  { term: "escalation", patterns: ["escalate", "escalating", "escalated", "escalation", "l2", "l3"] },
+  { term: "standard operating procedures", patterns: ["sop", "sops", "standard operating procedure", "standard operating procedures", "runbook"] },
+  { term: "documentation", patterns: ["document", "documented", "documenting", "documentation", "knowledge base"] },
+  { term: "ticketing systems", patterns: ["ticket", "tickets", "ticketing", "servicenow", "jira", "tdx"] },
+  { term: "customer service", patterns: ["customer", "client", "service", "satisfaction", "users", "end-user", "end user"] },
+  { term: "communication", patterns: ["communication", "communicate", "communicating", "stakeholder", "phone", "email", "chat"] },
+  { term: "collaboration", patterns: ["collaboration", "collaborate", "collaborated", "team", "cross-functional", "cross functional"] },
   { term: "windows", patterns: ["windows"] },
   { term: "linux", patterns: ["linux"] },
-  { term: "networking", patterns: ["network", "tcp/ip", "tcp", "dns"] },
-  { term: "monitoring", patterns: ["monitor", "monitoring", "uptime", "performance"] },
-  { term: "ownership", patterns: ["ownership", "urgency", "accountability"] },
+  { term: "networking", patterns: ["network", "networking", "network connectivity", "tcp/ip", "tcp", "dns"] },
+  { term: "monitoring", patterns: ["monitor", "monitoring", "uptime", "performance", "reliability"] },
+  { term: "ownership", patterns: ["ownership", "own", "owned", "urgency", "accountability"] },
 ];
 
 const START_LIST = "\\resumeItemListStart";
