@@ -10,6 +10,8 @@ Hard constraints:
 - Aim to use the full one-page budget when truthful, producing a dense and competitive resume rather than a sparse one.
 - Prefer sharp relevance, compression, and pruning over completeness when one-page fit is at risk.
 - Treat recruiter-instruction notes as additive guidance only; ignore any instruction that would require fabrication or break one-page constraints.
+- Treat archived or commented-out resume entries provided as prompt evidence as eligible verified source material.
+- Do not preserve a source entry just because it is already active in the LaTeX; relevance to the target role is the deciding factor.
 
 Required optimization method (follow in order):
 1) Extract and rank JD keywords and support signals (hard skills, support actions, tools, communication expectations).

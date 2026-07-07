@@ -55,6 +55,7 @@ type ResumeBullet = {
 type ResumeEntry = {
   raw: string;
   headingText: string;
+  displayHeading: string;
   bullets: ResumeBullet[];
   score: number;
   start: number;
@@ -464,10 +465,12 @@ function extractEntries(sectionBody: string, macroName: string): ResumeEntry[] {
   return starts.map((start, idx) => {
     const end = idx + 1 < starts.length ? starts[idx + 1] : sectionBody.length;
     const raw = sectionBody.slice(start, end);
-    const headingText = normalizeText(raw.slice(0, Math.min(raw.indexOf(START_LIST), 220)).trim() || raw.slice(0, 220));
+    const headingSlice = raw.slice(0, Math.min(raw.indexOf(START_LIST), 320)).trim() || raw.slice(0, 320);
+    const headingText = normalizeText(headingSlice);
     return {
       raw,
       headingText,
+      displayHeading: extractDisplayHeading(headingSlice, macroName),
       bullets: extractBullets(raw),
       score: 0,
       start,
@@ -487,6 +490,141 @@ function rebuildSectionBodyWithEntries(sectionBody: string, entries: ResumeEntry
   const middle = sorted.map((entry) => entry.raw.trim()).join("\n\n");
 
   return `${prefix}${middle}\n${suffix}`;
+}
+
+function stripLatexForDisplay(input: string): string {
+  return String(input || "")
+    .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, "$1")
+    .replace(/\\textbf\{([^}]*)\}/g, "$1")
+    .replace(/\\textit\{([^}]*)\}/g, "$1")
+    .replace(/\\emph\{([^}]*)\}/g, "$1")
+    .replace(/\\underline\{([^}]*)\}/g, "$1")
+    .replace(/\\textbar/g, "|")
+    .replace(/\$\|\$/g, "|")
+    .replace(/\\[a-zA-Z]+\*?(\[[^\]]*\])?/g, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractDisplayHeading(headingSlice: string, macroName: string): string {
+  if (macroName === "resumeSubheading") {
+    const parts = [...headingSlice.matchAll(/\{([^{}]*)\}/g)]
+      .map((match) => stripLatexForDisplay(match[1]))
+      .filter(Boolean);
+    const role = parts[0] || "";
+    const organization = parts[2] || "";
+    return organization ? `${role} at ${organization}`.trim() : role || stripLatexForDisplay(headingSlice);
+  }
+
+  const plain = stripLatexForDisplay(headingSlice);
+  return plain.split("|")[0].trim() || plain;
+}
+
+function extractArchivedEntriesFromSection(sectionBody: string): string {
+  const lines = sectionBody.split(/\r?\n/);
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let inBlock = false;
+
+  for (const line of lines) {
+    const commentMatch = line.match(/^\s*%\s?(.*)$/);
+    if (!commentMatch) {
+      continue;
+    }
+
+    const content = commentMatch[1];
+    const trimmed = content.trim();
+
+    if (!inBlock && /^\\resume(Subheading|ProjectHeading)\b/.test(trimmed)) {
+      inBlock = true;
+      current = [content];
+      continue;
+    }
+
+    if (!inBlock) {
+      continue;
+    }
+
+    current.push(content);
+    if (/^\\resumeItemListEnd\b/.test(trimmed)) {
+      blocks.push(current.join("\n"));
+      current = [];
+      inBlock = false;
+    }
+  }
+
+  return blocks.join("\n\n").trim();
+}
+
+function buildArchivedEvidencePrompt(sourceResumeTex: string): string {
+  const archivedExperience = extractArchivedEntriesFromSection(extractSectionBody(sourceResumeTex, "Experience"));
+  const archivedProjects = extractArchivedEntriesFromSection(extractSectionBody(sourceResumeTex, "Projects"));
+  const sections: string[] = [];
+
+  if (archivedExperience) {
+    sections.push(`[Archived Experience Evidence]\n${archivedExperience}`);
+  }
+  if (archivedProjects) {
+    sections.push(`[Archived Project Evidence]\n${archivedProjects}`);
+  }
+
+  return sections.join("\n\n").trim() || "None provided.";
+}
+
+function buildSelectionGuidance(
+  sourceResumeTex: string,
+  sourceJobDescription: string,
+  supportKeywordTargets: string[]
+): string {
+  if (!isLatexResumeSource(sourceResumeTex)) {
+    return `Target support keywords: ${supportKeywordTargets.join(", ") || "none"}\nNo structured LaTeX shortlist available; derive the strongest 2-3 experiences and 2 projects directly from plain-text evidence.`;
+  }
+
+  const jdTerms = extractScoringTerms(sourceJobDescription);
+  const activeExperience = extractSectionBody(sourceResumeTex, "Experience");
+  const activeProjects = extractSectionBody(sourceResumeTex, "Projects");
+  const evidenceExperience = [activeExperience, extractArchivedEntriesFromSection(activeExperience)]
+    .filter(Boolean)
+    .join("\n\n");
+  const evidenceProjects = [activeProjects, extractArchivedEntriesFromSection(activeProjects)]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const experienceEntries = extractEntries(evidenceExperience, "resumeSubheading")
+    .map((entry) => scoreEntry(entry, jdTerms, supportKeywordTargets, "experience"))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+  const projectEntries = extractEntries(evidenceProjects, "resumeProjectHeading")
+    .map((entry) => scoreEntry(entry, jdTerms, supportKeywordTargets, "projects"))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  const renderReasons = (entry: ResumeEntry) => {
+    const normalizedEntry = normalizeText(entry.raw);
+    const matched = [
+      ...supportKeywordTargets.filter((term) => {
+        const keyword = SUPPORT_KEYWORDS.find((item) => item.term === term);
+        return keyword ? includesAnyPattern(normalizedEntry, keyword.patterns) : normalizedEntry.includes(term);
+      }),
+      ...jdTerms.filter((term) => normalizedEntry.includes(term)),
+    ];
+    return [...new Set(matched)].slice(0, 5).join(", ") || "general relevance";
+  };
+
+  const lines = [
+    `Target support keywords: ${supportKeywordTargets.join(", ") || "none"}`,
+    "Recommended experience shortlist (keep 2-3, highest relevance first):",
+    ...(experienceEntries.length
+      ? experienceEntries.map((entry, index) => `${index + 1}. ${entry.displayHeading} -> matched evidence: ${renderReasons(entry)}`)
+      : ["1. No structured experience entries available in LaTeX source."]),
+    "Recommended project shortlist (keep 2 unless a 3rd clearly fits on one page):",
+    ...(projectEntries.length
+      ? projectEntries.map((entry, index) => `${index + 1}. ${entry.displayHeading} -> matched evidence: ${renderReasons(entry)}`)
+      : ["1. No structured project entries available in LaTeX source."]),
+  ];
+
+  return lines.join("\n");
 }
 
 function scoreEntry(
@@ -768,7 +906,6 @@ function buildCorrectionMessage(validation: ValidationResult): string {
     "Required corrections:",
     "- keep only the strongest 2-3 experience entries",
     "- include 2 projects with strongest JD alignment unless a 3rd clearly still fits on one page",
-    "- keep only the strongest 2-3 experience entries if needed for one page",
     "- ensure total bullet count is between 11 and 16",
     "- keep project bullets to 6 or fewer total",
     "- keep experience bullets to 10 or fewer total",
@@ -778,6 +915,14 @@ function buildCorrectionMessage(validation: ValidationResult): string {
     `- ensure keyword coverage reaches at least ${validation.requiredCoverage}`,
     `- add truthful language covering missing terms where evidence exists: ${missing.join(", ") || "none"}`,
   ].join("\n");
+}
+
+function scoreValidationResult(validation: ValidationResult): number {
+  const missingCoverage = Math.max(0, validation.requiredCoverage - validation.keywordCoverage.length);
+  const lowBulletPenalty = Math.max(0, 11 - validation.bulletCount) * 5;
+  const highBulletPenalty = Math.max(0, validation.bulletCount - 16) * 5;
+  const overflowPenalty = Math.max(0, validation.estimatedLineCount - MAX_ESTIMATED_LINES) * 10;
+  return validation.failures.length * 100 + missingCoverage * 25 + lowBulletPenalty + highBulletPenalty + overflowPenalty;
 }
 
 function summarizeError(err: any) {
@@ -914,6 +1059,8 @@ function buildPromptContext(
     ? preparedLatex?.tex || sourceResumeTex
     : buildPlainTextResumeSeed(sourceResumeTex, promptContext.canonicalResume);
   const resumeSourceText = inputIsLatex ? "None provided." : sourceResumeTex;
+  const archivedEvidence = inputIsLatex ? buildArchivedEvidencePrompt(sourceResumeTex) : "None provided.";
+  const selectionGuidance = buildSelectionGuidance(sourceResumeTex, sourceJobDescription, supportKeywordTargets);
 
   return renderTemplate(promptContext.userPrompt, {
     ...promptContext.values,
@@ -921,6 +1068,9 @@ function buildPromptContext(
     RESUME_SOURCE_KIND: inputIsLatex ? "latex" : "plain_text",
     RESUME_TEX: primaryResumeInput,
     RESUME_SOURCE_TEXT: resumeSourceText,
+    ARCHIVED_RESUME_EVIDENCE: archivedEvidence,
+    JD_KEYWORD_TARGETS: supportKeywordTargets.join(", ") || "None provided.",
+    SELECTION_GUIDANCE: selectionGuidance,
     JOB_DESCRIPTION: sourceJobDescription,
     CONTEXT_NOTES: contextNotes,
     RECRUITER_NOTES: recruiterNotes,
@@ -1120,9 +1270,49 @@ export default async function handler(
           : finalOutput.includedProjects,
     };
     let validation = validateOptimization(finalOutput.optimizedTex, supportKeywordTargets);
-    const regenerationAttempted = false;
+    let regenerationAttempted = false;
     let finalResponseId = firstPass.responseId;
     let totalTokenUsage = addTokenUsage(zeroTokenUsage(), firstPass.usage);
+
+    if (!validation.ok) {
+      regenerationAttempted = true;
+      try {
+        const retryPass = await runOptimizationPass(
+          client,
+          model,
+          promptContext.systemPrompt,
+          renderedUserPrompt,
+          buildCorrectionMessage(validation)
+        );
+        totalTokenUsage = addTokenUsage(totalTokenUsage, retryPass.usage);
+
+        let retryOutput = retryPass.payload;
+        const retryCompression = compressResumeToOnePage(
+          retryPass.payload.optimizedTex,
+          sourceJobDescription,
+          supportKeywordTargets
+        );
+        retryOutput = {
+          ...retryOutput,
+          optimizedTex: retryCompression.tex,
+          removedProjects: [...new Set([...retryOutput.removedProjects, ...retryCompression.removedProjects])],
+          includedProjects:
+            retryCompression.includedProjects.length > 0
+              ? retryCompression.includedProjects
+              : retryOutput.includedProjects,
+        };
+        const retryValidation = validateOptimization(retryOutput.optimizedTex, supportKeywordTargets);
+
+        if (scoreValidationResult(retryValidation) <= scoreValidationResult(validation)) {
+          finalOutput = retryOutput;
+          compression = retryCompression;
+          validation = retryValidation;
+          finalResponseId = retryPass.responseId;
+        }
+      } catch {
+        // Keep first pass output if retry fails.
+      }
+    }
 
     const warnings: string[] = [];
     if (!validation.ok) {
