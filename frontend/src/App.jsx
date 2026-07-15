@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
+import { compilePdf, generateTex } from './api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BACKEND_URL, compilePdf, generateCoverLetter, generateTex, scrapeJob } from './api';
 import { DashboardShell } from './dashboard/DashboardShell';
@@ -930,6 +933,22 @@ function ManualStudio() {
   }
 
   return (
+    <div className="page">
+      <Analytics />
+      <main className="container">
+        <h1>ResumeTailor MVP</h1>
+        <p className="subtitle">LaTeX-first resume optimization with ATS alignment and PDF auto-download.</p>
+
+        <section className="panel">
+          <h2>1) Resume Input</h2>
+          <input type="file" accept=".tex" onChange={onUploadFile} />
+          <textarea
+            rows={16}
+            value={resumeTex}
+            onChange={(e) => setResumeTex(e.target.value)}
+            placeholder="Paste your full LaTeX resume here..."
+          />
+        </section>
     <div className="app-shell">
       <header className="app-header">
         <h1>ResumeTailor Pipeline</h1>
